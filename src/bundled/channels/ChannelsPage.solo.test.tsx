@@ -237,6 +237,7 @@ function fixture({
     complete: true,
     identities: agents,
     selectable: agents,
+    admissible: agents,
     archives: { status: "unavailable" as const, archived: [] },
   };
   // A stable snapshot, as useSyncExternalStore requires.
