@@ -17,7 +17,11 @@ import {
 } from "../../bundled/emoji/GifDraftPreview";
 import { accentButtonStyle } from "../../shared/theme/accent";
 import { stageChatCards } from "./composer-chat-cards";
-import { pastedFiles } from "./composer-clipboard";
+import {
+  fetchPastedImages,
+  pastedFiles,
+  pastedInlineImages,
+} from "./composer-clipboard";
 import { chatCardIds } from "./chat-cards";
 import { ComposerChatCards } from "./ComposerChatCards";
 import { useConversationPresentation } from "../conversation/ConversationPresentation";
@@ -1541,6 +1545,11 @@ function Composer({
       );
     }
   }
+  // Pictures read after their paste attach to the composer as it is then,
+  // never once it unmounts.
+  const attachLate = useEffectEvent((files: readonly File[]) => {
+    if (live.current) attachFiles(files);
+  });
   const outbox = session.outbox;
   const emojiCatalog = useSyncExternalStore(
     session.emoji.subscribe,
@@ -3681,7 +3690,12 @@ function Composer({
         }}
         onPasteCapture={(event) => {
           const files = pastedFiles(event.clipboardData);
-          if (!files.length) return;
+          if (!files.length) {
+            // The editor pastes the text; pictures only in its HTML follow.
+            const images = pastedInlineImages(event.clipboardData);
+            if (images.length) void fetchPastedImages(images).then(attachLate);
+            return;
+          }
           event.preventDefault();
           event.stopPropagation();
           attachFiles(files);
