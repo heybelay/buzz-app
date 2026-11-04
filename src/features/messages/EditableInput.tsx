@@ -92,6 +92,7 @@ import {
   composerClipboard,
   identityLink,
   pastedFiles,
+  pastedHtml,
 } from "./composer-clipboard";
 import {
   mentionBoundary,
@@ -2374,7 +2375,7 @@ export function EditableInput({
             )
               return true;
             // Code takes visible text verbatim; prose preserves copied web links.
-            const html = event.clipboardData?.getData("text/html") ?? "";
+            const html = pastedHtml(event.clipboardData);
             const hasPlain =
               !!plain || event.clipboardData?.types?.includes("text/plain");
             const copy = code ? undefined : buzzCopyDocument(html);
