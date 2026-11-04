@@ -88,7 +88,8 @@ export function ImageReviewStage({
   const selected = attachments[selectedIndex] ?? attachments[0];
   const source = selected ? media(selected.url) : undefined;
   const load = useImageLoad(source);
-  // Only a loaded original can be zoomed, copied, downloaded or opened.
+  // Only a loaded original can be zoomed, copied, downloaded or opened. Its
+  // actions stay in place, disabled, so the toolbar never shifts under a press.
   const pixels = load ? undefined : source;
   // Focus a failure or recovery took away, by removing or disabling its
   // control, moves to what replaced it: Retry, or the stage once the image is
@@ -102,7 +103,10 @@ export function ImageReviewStage({
     const focused = document.activeElement;
     if (
       focused !== document.body &&
-      !(element.contains(focused) && focused?.matches(":disabled"))
+      !(
+        element.contains(focused) &&
+        focused?.matches(':disabled, [aria-disabled="true"]')
+      )
     )
       return;
     if (failure) focusRetry(element);
@@ -114,8 +118,8 @@ export function ImageReviewStage({
     void source;
     if (press.current) press.current.click = false;
   }, [source]);
-  const nativeSource = pixels ? isNativeMediaSource(pixels) : false;
-  const proxySource = pixels ? isProxySource(pixels) || nativeSource : false;
+  const nativeSource = source ? isNativeMediaSource(source) : false;
+  const proxySource = source ? isProxySource(source) || nativeSource : false;
   const [downloadFeedbackVisible, setDownloadFeedbackVisible] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyNotice, setCopyNotice] = useState<"success" | "error">();
@@ -123,7 +127,7 @@ export function ImageReviewStage({
   const copyNoticeTimer = useRef<number | undefined>(undefined);
   const selectedUrlRef = useRef(selectedUrl);
   selectedUrlRef.current = selectedUrl;
-  const externalSource = pixels ? safeOpenUrl(pixels) && !proxySource : false;
+  const externalSource = source ? safeOpenUrl(source) && !proxySource : false;
   const canCopyImage =
     allowCopy && proxySource && (nativeSource || supportsImageCopy());
   const {
@@ -453,7 +457,7 @@ export function ImageReviewStage({
             type="button"
             aria-label="Copy image"
             title="Copy image"
-            disabled={!canCopyImage}
+            disabled={!pixels}
             loading={copying}
             onClick={() => void copyImage()}
             icon={<CopyIcon size={17} aria-hidden="true" />}
@@ -464,11 +468,12 @@ export function ImageReviewStage({
             {copyNotice === "success" ? "Image copied" : "Couldn't copy image"}
           </span>
         )}
-        {nativeSource && pixels && (
+        {nativeSource && source && (
           <MediaDownloadAction
-            key={JSON.stringify([selected.url, pixels, selected.name])}
+            key={JSON.stringify([selected.url, source, selected.name])}
             kind="image"
-            source={pixels}
+            source={source}
+            disabled={!pixels}
             name={selected.name ?? ""}
             onFeedbackVisible={setDownloadFeedbackVisible}
           />
@@ -477,6 +482,7 @@ export function ImageReviewStage({
           <IconButton
             nativeButton={false}
             role="link"
+            disabled={!pixels}
             render={<a href={pixels} download />}
             size="sm"
             aria-label="Download image"
@@ -484,16 +490,18 @@ export function ImageReviewStage({
             icon={<DownloadIcon size={17} />}
           />
         )}
-        {pixels && externalSource && (
+        {externalSource && (
           <IconButton
             nativeButton={false}
             role="link"
+            disabled={!pixels}
             render={
               <a
                 href={pixels}
                 target="_blank"
                 rel="noreferrer"
                 onClick={(event) => {
+                  if (!pixels) return;
                   if (event.metaKey || event.ctrlKey || event.shiftKey) return;
                   if (onOpenLink(pixels)) event.preventDefault();
                 }}
