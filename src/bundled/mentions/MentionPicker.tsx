@@ -354,7 +354,7 @@ export function MentionPicker({
                 type="button"
                 onClick={() =>
                   void session.agentChoices.refresh(
-                    !!inviteAgents || teams.includeLegacy,
+                    model.includeLegacy || teams.includeLegacy,
                   )
                 }
               >
