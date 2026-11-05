@@ -10,7 +10,11 @@ import {
 import type { MentionRecipient } from "../../features/messages/mention-draft";
 import type { MentionRoster } from "../../features/messages/draft-mention-roster";
 import type { Agent } from "../../features/agents/service";
-import { mentionCandidates, offeredElsewhere } from "./mention-candidates";
+import {
+  elsewhereHeld,
+  mentionCandidates,
+  offeredElsewhere,
+} from "./mention-candidates";
 import { continuingNames } from "./mention-ranking";
 import { namedCandidates, spaceMention } from "./use-mention-choices";
 import { teamBlocksSpace } from "./use-team-mentions";
@@ -129,14 +133,19 @@ async function resolve(
         "background",
       )
       .catch(() => {});
-  if (invite) {
+  // The chooser holds the owner's agents from other communities until all of
+  // the owner's agents here are known; invited agents may be partial.
+  if (
+    invite ||
+    elsewhereHeld(session, channelId, inviteAgents, roster, elsewhere)
+  ) {
     const release = session.agentChoices.retain();
     try {
       session.agentChoices.ensure(true);
       await settled(
         session.agentChoices.subscribe,
         session.agentChoices.snapshot,
-        (agents) => !agents.pending || agents.status === "ready",
+        (agents) => !agents.pending || (invite && agents.status === "ready"),
         signal,
       );
     } finally {
