@@ -10,7 +10,7 @@ import {
 import type { MentionRecipient } from "../../features/messages/mention-draft";
 import type { MentionRoster } from "../../features/messages/draft-mention-roster";
 import type { Agent } from "../../features/agents/service";
-import { mentionCandidates } from "./mention-candidates";
+import { mentionCandidates, offeredElsewhere } from "./mention-candidates";
 import { continuingNames } from "./mention-ranking";
 import { namedCandidates, spaceMention } from "./use-mention-choices";
 import { teamBlocksSpace } from "./use-team-mentions";
@@ -34,7 +34,7 @@ export type SpaceMentionScope = {
   selected: readonly MentionRecipient[];
   /** Current saved names, also read after asynchronous directory resolution. */
   teamNames?: (() => readonly string[]) | undefined;
-  /** The owner's agents in their other communities, as the chooser offers them. */
+  /** The owner's agents in their other communities (`Agents.joinable()`). */
   elsewhere?: readonly Pick<Agent, "pubkey" | "name" | "relay">[] | undefined;
 };
 
@@ -146,6 +146,7 @@ async function resolve(
   const kit = fullSession(session)?.channelKit;
   if (teamBlocksSpace(kit?.snapshot() ?? { entries: [] }, name, teamNames?.()))
     return null;
+  const offered = offeredElsewhere(session, elsewhere);
   const local = new Set(
     mentionCandidates(
       session,
@@ -153,7 +154,7 @@ async function resolve(
       inviteAgents,
       roster,
       undefined,
-      elsewhere,
+      offered,
     ).map((c) => c.recipient.pubkey),
   );
   const profiles = session.profiles.snapshot();
@@ -177,7 +178,7 @@ async function resolve(
       roster,
       selected,
       people,
-      elsewhere,
+      offered,
     );
     const pubkey = spaceMention(choices, local, query, {
       pending: false,
