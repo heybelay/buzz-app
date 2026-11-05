@@ -108,6 +108,10 @@ type State = {
    * else's doing. Each is kept until the relay answers for its channel (see
    * `answered`). One that failed before publishing is not recorded. */
   ownLosses: readonly OwnLoss[];
+  /** Counts Refresh channels chosen from a lifecycle failure. Settings reads
+   * its channel actions again on each one: 39001 roles and owner-agent
+   * profiles can change without the roster's role hint. */
+  lifecycleRefreshes: number;
 };
 type OwnLoss = Readonly<{
   channelId: string;
@@ -583,6 +587,10 @@ export function ChannelNavigationProvider({
                 connection.session.channels.refreshList?.({
                   consistency: "strong",
                 });
+                update((previous) => ({
+                  ...previous,
+                  lifecycleRefreshes: previous.lifecycleRefreshes + 1,
+                }));
                 setFailure(undefined);
               }}
             >
@@ -613,5 +621,6 @@ function restore(session: RelaySession, scope: string): State {
     inactiveRun: undefined,
     inactiveRuns: [],
     ownLosses: [],
+    lifecycleRefreshes: 0,
   };
 }
