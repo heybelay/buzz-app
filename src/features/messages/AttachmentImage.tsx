@@ -192,70 +192,70 @@ export function AttachmentImage({
         name={attachment.name}
         onView={viewImage}
       >
-      {/* A failure keeps this frame, its preview and its request in place.
-          Without href or a click listener it is no link, so its Retry is not
-          nested in one. */}
-      <a
-        ref={frame}
-        className={styles.attachmentImage}
-        style={style}
-        role={failed ? "none" : undefined}
-        href={failed ? undefined : (source ?? attachment.url)}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={failed ? undefined : label}
-        data-media-preview=""
-        data-image-ready={decodedDimensions ? true : undefined}
-        data-image-failed={failed ? "" : undefined}
-        onClick={
-          failed
-            ? undefined
-            : (event) => {
-                // Every activation stays in-app, modifiers included: the desktop
-                // opener treats an unprevented Ctrl/Shift or `_blank` click as browser
-                // intent, and no browser tab holds the app's credentials.
-                event.preventDefault();
-                prepareReviewEntrance(event);
-                viewImage();
-              }
-        }
-      >
-        {/* Retargeting retires both the DOM pixels and all pending callbacks before
-            the new source can paint. Session switches also remount the workspace. */}
-        <span className={styles.attachmentImagePixels}>
-          {source && (
-            <ImagePixels
-              key={JSON.stringify([source, attachment.blurhash])}
-              session={session}
-              source={source}
-              thumbnail={thumbnail}
-              blurhash={attachment.blurhash}
-              paused={failed && load === "failed"}
-              onDecoded={onDecoded}
+        {/* A failure keeps this frame, its preview and its request in place.
+            Without href or a click listener it is no link, so its Retry is not
+            nested in one. */}
+        <a
+          ref={frame}
+          className={styles.attachmentImage}
+          style={style}
+          role={failed ? "none" : undefined}
+          href={failed ? undefined : (source ?? attachment.url)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={failed ? undefined : label}
+          data-media-preview=""
+          data-image-ready={decodedDimensions ? true : undefined}
+          data-image-failed={failed ? "" : undefined}
+          onClick={
+            failed
+              ? undefined
+              : (event) => {
+                  // Every activation stays in-app, modifiers included: the desktop
+                  // opener treats an unprevented Ctrl/Shift or `_blank` click as browser
+                  // intent, and no browser tab holds the app's credentials.
+                  event.preventDefault();
+                  prepareReviewEntrance(event);
+                  viewImage();
+                }
+          }
+        >
+          {/* Retargeting retires both the DOM pixels and all pending callbacks before
+              the new source can paint. Session switches also remount the workspace. */}
+          <span className={styles.attachmentImagePixels}>
+            {source && (
+              <ImagePixels
+                key={JSON.stringify([source, attachment.blurhash])}
+                session={session}
+                source={source}
+                thumbnail={thumbnail}
+                blurhash={attachment.blurhash}
+                paused={failed && load === "failed"}
+                onDecoded={onDecoded}
+              />
+            )}
+            {overlayCount > 0 && (
+              <span className={styles.imageOverflow} aria-hidden="true">
+                +{overlayCount}
+              </span>
+            )}
+          </span>
+          <svg
+            className={styles.imageOutline}
+            data-image-outline=""
+            aria-hidden="true"
+          >
+            <path />
+          </svg>
+          {failed && source && (
+            <ImageLoadError
+              ref={keepFocus}
+              name={name}
+              retrying={load === "retrying"}
+              onRetry={() => retryImage(source)}
             />
           )}
-          {overlayCount > 0 && (
-            <span className={styles.imageOverflow} aria-hidden="true">
-              +{overlayCount}
-            </span>
-          )}
-        </span>
-        <svg
-          className={styles.imageOutline}
-          data-image-outline=""
-          aria-hidden="true"
-        >
-          <path />
-        </svg>
-        {failed && source && (
-          <ImageLoadError
-            ref={keepFocus}
-            name={name}
-            retrying={load === "retrying"}
-            onRetry={() => retryImage(source)}
-          />
-        )}
-      </a>
+        </a>
       </MediaContextMenu>
       {active &&
         viewerOpen &&
@@ -270,11 +270,11 @@ export function AttachmentImage({
               source={source}
               name={attachment.name}
             >
-            <img
-              className={styles.mediaViewerImage}
-              src={source}
-              alt="Attachment preview"
-            />
+              <img
+                className={styles.mediaViewerImage}
+                src={source}
+                alt="Attachment preview"
+              />
             </MediaContextMenu>
           </MediaViewer>,
           document.body,
