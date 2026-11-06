@@ -1396,8 +1396,11 @@ available rather than silently discarding it.
   below can deliberately add memory guidance, channel membership, and check-ins.
 - When the optional **Bestie** plugin is on, the saved choice also opens the
   agent's DM from the first position in the left Apps dock, using the agent's
-  name and avatar. The Messages sidebar omits the duplicate Bestie row. Bestie
-  uses the same conversation tabs as Messages: threads open beside the chat (or
+  name and avatar. The Messages sidebar omits the duplicate Bestie row, and
+  links to that DM or one of its threads, such as a thread's **In DM** link in
+  Activity, open in Bestie. Links to a single top-level message, Forward, and
+  Members still open in Messages. Bestie uses the same conversation tabs as
+  Messages: threads open beside the chat (or
   in the main pane, following your thread placement setting), and can be moved,
   renamed, or closed. Collapsing the side pane keeps its open threads and reply
   drafts. Its header includes the same DM controls and actions, including Huddle
