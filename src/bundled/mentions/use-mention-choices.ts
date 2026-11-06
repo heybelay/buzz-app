@@ -588,16 +588,22 @@ export function useMentionChoices(
     }
   }
   if (rows && rows.length < MENTION_ROWS) {
-    // Append-only: late invited or own agents and directory pages never move
-    // shown rows. Member-list changes keep their installed set until the query
-    // changes.
+    // Append-only: late invited or offered agents and `outside` rows never
+    // move shown rows. Offered agents here come first: they are local.
+    // Member-list changes keep their installed set until the query changes.
     const shown = new Set(rows.map((row) => row.recipient.pubkey));
-    const added = rank(
-      matches.filter((c) =>
-        invite
-          ? c.agent || !local.has(c.recipient.pubkey)
-          : !local.has(c.recipient.pubkey) || (c.agent && !c.member),
-      ),
+    const added = (
+      invite
+        ? rank(matches.filter((c) => c.agent || !local.has(c.recipient.pubkey)))
+        : [
+            ...rank(
+              matches.filter(
+                (c) =>
+                  !c.member && !c.elsewhere && local.has(c.recipient.pubkey),
+              ),
+            ),
+            ...outside(),
+          ]
     )
       .filter((c) => !shown.has(c.recipient.pubkey))
       .slice(0, MENTION_ROWS - rows.length);

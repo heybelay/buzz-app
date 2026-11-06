@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
-import { directoryChanges, mentionCandidates } from "./mention-candidates";
+import {
+  directoryChanges,
+  elsewhereMatches,
+  mentionCandidates,
+} from "./mention-candidates";
 import type { ComposerSession } from "../../features/messages/composer-session";
 import {
   type NamePreference,
@@ -255,4 +259,57 @@ it("offers the viewer's agents in a DM, where they are named but never added", (
   // Another community's agent (7) could only join, which a DM cannot do.
   expect(offered).toContainEqual([key(6), false, true]);
   expect(offered.map(([pubkey]) => pubkey)).not.toContain(key(7));
+});
+
+it("holds an agent from another community for every name its row has without the directory", () => {
+  const far = key(7);
+  const session = fresh();
+  // Archived here under another name, it still takes its row from the other
+  // community, with the names cached here.
+  Object.assign(session, {
+    profiles: {
+      snapshot: () =>
+        new Map<string, unknown>([
+          ...profiles,
+          [
+            far,
+            {
+              name: "Old",
+              verified: {
+                displayName: "farh",
+                username: "farh",
+                fullName: "Faraday",
+              },
+            },
+          ],
+        ]),
+    },
+    agentChoices: {
+      snapshot: () => ({
+        identities: [...agents, { pubkey: far, name: "Renamed" }],
+      }),
+    },
+    archives: {
+      snapshot: () => ({ status: "ready", archived: [key(5), far] }),
+    },
+  });
+  const row = mentionCandidates(
+    session,
+    "c",
+    false,
+    undefined,
+    undefined,
+    elsewhere,
+  ).find((c) => c.recipient.pubkey === far);
+  expect(row?.elsewhere).toBe("other.example");
+  expect([...(row?.aliases ?? [])].sort()).toEqual(
+    ["Far", "Faraday", "Old", "Renamed", "farh"].sort(),
+  );
+  for (const name of row?.aliases ?? [])
+    expect(
+      elsewhereMatches(session, "c", false, undefined, elsewhere, name),
+    ).toBe(true);
+  expect(
+    elsewhereMatches(session, "c", false, undefined, elsewhere, "Ada"),
+  ).toBe(false);
 });
