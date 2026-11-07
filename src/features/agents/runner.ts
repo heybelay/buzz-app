@@ -717,11 +717,13 @@ export class AgentRunners {
     this.turns = this.left = this.stopped = host.interrupted.read();
   }
 
-  /** Whether any agent has a job queued or in a lane, or a turn still working. */
+  /** Whether any agent has an event being classified, a job queued or in a
+   * lane, or a turn still working. */
   isWorking() {
     return this.workingCountNow > 0;
   }
-  /** How many agents have a job queued or in a lane, or a turn still working. */
+  /** How many agents have an event being classified, a job queued or in a
+   * lane, or a turn still working. */
   workingCount() {
     return this.workingCountNow;
   }
@@ -737,6 +739,7 @@ export class AgentRunners {
       if (
         runner.busy.size > 0 ||
         runner.working > 0 ||
+        runner.classifying > 0 ||
         runner.queues.mention.length > 0 ||
         runner.queues.watch.length > 0
       )
@@ -2265,6 +2268,7 @@ export class AgentRunners {
       return false;
     }
     runner.classifying += inputs.length;
+    this.noteWorking();
     if (trigger.type === "source") this.sourceJobs.set(job, agent.key);
     const count = (by: number) => {
       const next = (runner.classifyingIn.get(interest) ?? 0) + by;
@@ -2329,6 +2333,9 @@ export class AgentRunners {
           });
       } finally {
         unreserve();
+        // Here, not in unreserve: a passing event is queued by then, so the
+        // count does not dip to zero between classifying and queued.
+        this.noteWorking();
         if (trigger.type === "source") {
           this.sourceJobs.delete(job);
           const object = job.matched?.object;
