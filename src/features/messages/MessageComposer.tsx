@@ -3169,6 +3169,10 @@ function Composer({
               )
             : sender.messages.send(channelId, content, recipients, uploaded);
       }
+      const pending: AcceptedDraft = {
+        next: mentionDraft(""),
+        revision: savedRevision,
+      };
       const publish = (
         uploaded: readonly UploadedAttachment[],
         validated = false,
@@ -3224,6 +3228,9 @@ function Composer({
               return send.publish(recovery);
             },
             onSend: (id) => {
+              // A queued send publishes after its draft was cleared, so a
+              // retried cleanup must learn the id here.
+              pending.sent = id;
               if (live.current) onSend?.(id);
             },
           },
@@ -3231,10 +3238,6 @@ function Composer({
         );
       };
       let id: string | undefined;
-      const pending: AcceptedDraft = {
-        next: mentionDraft(""),
-        revision: savedRevision,
-      };
       if (capturedAttachments.length && !fullSession(session)) {
         setSending(true);
         const uploaded = await attachments.store.prepareForSend(attempt.signal);
