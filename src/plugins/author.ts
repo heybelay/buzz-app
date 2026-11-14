@@ -163,6 +163,10 @@ export type {
 } from "../features/notifications/service";
 
 export type { VoiceRecording } from "../features/relay/voice-media";
+export type {
+  RecommendedCandidate,
+  RecommendedSetup,
+} from "../features/agents/recommended";
 
 export type {
   Agents,
@@ -173,6 +177,7 @@ export type {
   AgentSession,
   AgentSessions,
   Delivery,
+  RecommendedSource,
   StandaloneTurn,
   TurnResult,
 } from "../features/agents/service";
