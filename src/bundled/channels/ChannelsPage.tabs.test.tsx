@@ -1113,6 +1113,7 @@ it.each(["Share access", "Chat actions"])(
     const h = await page("stream", {
       open: vi.fn(async () => ({ status: "opened" as const })),
       snapshot: () => snapshot,
+      subscribe: () => () => {},
     } as unknown as Navigation);
     const tabs = renderHook(() => useChannelTabState(h.session, "alpha"));
     act(() =>
