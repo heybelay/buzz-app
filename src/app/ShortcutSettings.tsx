@@ -38,6 +38,7 @@ import {
 } from "../features/messages/send-key-preference";
 import type { PluginManager } from "../plugins/manager";
 import { editKeyPreference } from "../features/messages/edit-key-preference";
+import { conversationFeatures } from "./conversation-features";
 
 type Row = Readonly<{
   key: string;
@@ -205,12 +206,16 @@ function useShortcutGroups({
   );
   const sendWithModEnter = useSendWithModEnterPreference();
 
+  // Host-owned features contribute shortcuts without a catalog entry.
   const pluginName = (id: string) =>
     (configuration.status === "ready"
       ? configuration.catalog.plugins.find(
           (plugin) => plugin.manifest.id === id,
         )?.manifest.name
-      : undefined) ?? id;
+      : undefined) ??
+    conversationFeatures.find(({ manifest }) => manifest.id === id)?.manifest
+      .name ??
+    id;
   const row = (
     key: string,
     shortcut: NormalizedShortcut,

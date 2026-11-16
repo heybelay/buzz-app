@@ -998,6 +998,55 @@ it("keeps the host group distinct from a plugin whose manifest id is buzz", asyn
   }
 });
 
+it("names a host-owned feature's group and conflict owner from its manifest, and an unlisted plugin by id", async () => {
+  const user = userEvent.setup();
+  const h = await harness();
+  try {
+    // Host-owned features contribute like plugins but have no catalog entry.
+    await h.contribute("buzz.emoji", {
+      id: "gif-picker",
+      title: "Open GIF picker",
+      binding: { key: "g", mod: true },
+      run: vi.fn(),
+    });
+    await h.contribute("example.unlisted", {
+      id: "ping",
+      title: "Ping",
+      binding: { key: "p", mod: true },
+      run: vi.fn(),
+    });
+    render(
+      <ShortcutSettings
+        shortcuts={h.shortcuts}
+        bindings={h.bindings}
+        plugins={h.plugins}
+      />,
+    );
+    expect(
+      screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual([
+      "Sending messages",
+      "Editing messages",
+      "Buzz",
+      "Emoji",
+      "example.unlisted",
+      "Shortcut counter",
+      "Terminal",
+      "Message formatting",
+    ]);
+    await user.click(change("Open Settings"));
+    fireEvent.keyDown(capture("Open Settings"), { key: "g", ctrlKey: true });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Ctrl+G is already used by Open GIF picker (Emoji).",
+    );
+    expect(h.bindings.snapshot().overrides).toEqual({});
+  } finally {
+    await h.dispose();
+  }
+});
+
 it.each([false, true])(
   "Tab leaves capture without saving (backwards=%s)",
   async (shift) => {
