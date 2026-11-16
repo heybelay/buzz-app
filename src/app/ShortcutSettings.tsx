@@ -38,7 +38,7 @@ import {
 } from "../features/messages/send-key-preference";
 import type { PluginManager } from "../plugins/manager";
 import { editKeyPreference } from "../features/messages/edit-key-preference";
-import { conversationFeatures } from "./conversation-features";
+import { conversationFeatureManifests } from "./conversation-feature-manifests";
 
 type Row = Readonly<{
   key: string;
@@ -206,15 +206,17 @@ function useShortcutGroups({
   );
   const sendWithModEnter = useSendWithModEnterPreference();
 
-  // Host-owned features contribute shortcuts without a catalog entry.
+  // Host-owned features contribute without a catalog entry, and the manager
+  // never activates a catalog entry under one's id, so their manifests go first.
   const pluginName = (id: string) =>
+    Object.values(conversationFeatureManifests).find(
+      (manifest) => manifest.id === id,
+    )?.name ??
     (configuration.status === "ready"
       ? configuration.catalog.plugins.find(
           (plugin) => plugin.manifest.id === id,
         )?.manifest.name
       : undefined) ??
-    conversationFeatures.find(({ manifest }) => manifest.id === id)?.manifest
-      .name ??
     id;
   const row = (
     key: string,
@@ -325,7 +327,7 @@ export function ShortcutSettings({
 }: {
   shortcuts: ShortcutsService;
   bindings: ShortcutBindings;
-  /** Display names for plugin groups come from the catalog. */
+  /** Names plugin groups from the catalog. Host-owned features are named from their own manifests instead. */
   plugins: Pick<PluginManager, "subscribe" | "snapshot">;
   apple?: boolean;
   /** Packaged desktop build, where close/quit chords belong to the shell. */

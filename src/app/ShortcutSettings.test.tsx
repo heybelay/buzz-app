@@ -1047,6 +1047,32 @@ it("names a host-owned feature's group and conflict owner from its manifest, and
   }
 });
 
+it("names a host-owned feature from its own manifest when a catalog entry shares its id", async () => {
+  const h = await harness();
+  try {
+    await h.contribute("buzz.emoji", {
+      id: "gif-picker",
+      title: "Open GIF picker",
+      binding: { key: "g", mod: true },
+      run: vi.fn(),
+    });
+    render(
+      <ShortcutSettings
+        shortcuts={h.shortcuts}
+        bindings={h.bindings}
+        // The manager never activates this entry: the host feature owns the id.
+        plugins={catalog([info("buzz.emoji", "Shadowed emoji")])}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Emoji", level: 3 }),
+    ).toBeVisible();
+    expect(screen.queryByText("Shadowed emoji")).not.toBeInTheDocument();
+  } finally {
+    await h.dispose();
+  }
+});
+
 it.each([false, true])(
   "Tab leaves capture without saving (backwards=%s)",
   async (shift) => {
