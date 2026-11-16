@@ -1837,8 +1837,14 @@ mod tests {
             "legacy-On migration set"
         );
 
-        let features =
-            fs::read_to_string(format!("{root}/../app/conversation-features.ts")).unwrap();
+        // The manifest-only module lists the host-owned features. The module that
+        // pairs them with their code is read too, so one added there is checked.
+        let features = [
+            "conversation-feature-manifests.ts",
+            "conversation-features.ts",
+        ]
+        .map(|file| fs::read_to_string(format!("{root}/../app/{file}")).unwrap())
+        .join("\n");
         let manifests: BTreeMap<_, _> = features
             .lines()
             .filter_map(|line| {
@@ -1852,7 +1858,7 @@ mod tests {
             })
             .collect();
         let mut host_ids: Vec<_> = features
-            .split("manifest: { ...")
+            .split(": { ...")
             .skip(1)
             .map(|entry| manifests[entry.split(',').next().unwrap()].to_string())
             .collect();

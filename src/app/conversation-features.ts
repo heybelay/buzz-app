@@ -15,6 +15,8 @@ const modules: Record<Feature, PluginModule> = {
 
 // Host-owned features use the shared contribution lifecycle, without catalog
 // entries or saved enablement. Keep their keys for composer and huddle consumers.
+// Add a feature in `conversation-feature-manifests`, not here: a Rust test reads
+// both files as text to match the native reserved ids (see the note there).
 export const conversationFeatures: readonly BundledPlugin[] = (
   Object.keys(conversationFeatureManifests) as Feature[]
 ).map((feature) => ({
