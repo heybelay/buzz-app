@@ -488,6 +488,7 @@ function setup(
     registerTab: () => {},
     controlAttention: () => {},
     recommend: () => {},
+    pluginsStarted: () => true,
     registerSessionRouter: () => {},
     registerExecution: () => {},
     bindExecution: async () => {},

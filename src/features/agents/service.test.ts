@@ -134,6 +134,7 @@ import {
   recommendedSetup,
   setRuntimeRecommendation,
 } from "./recommended";
+import { cutoverOffer, setCutoverOffer } from "./cutover";
 
 /** The tag that the echo type's default watch matches. */
 const DEPLOY = ["t", "deploy"];
@@ -3398,6 +3399,38 @@ it("ignores the model and effort asked of an agent on Automatic", async () => {
   }
 });
 
+it("says when plugin start-up is over, and tells subscribers once", () => {
+  const ctx = new Context();
+  let settled = false;
+  const listeners = new Set<() => void>();
+  ctx.provide("pluginStatus", {
+    isActive: () => true,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    settled: () => settled,
+  });
+  const client = fakeCommunities(fakeRelay());
+  const service = new AgentsService(
+    ctx,
+    client.communities,
+    fakeNative(),
+    memoryStorage(),
+  );
+  const heard = vi.fn();
+  service.subscribe(heard);
+  expect(service.pluginsStarted()).toBe(false);
+  // A plugin changing while others still start: nothing to tell yet.
+  for (const listener of listeners) listener();
+  expect(heard).not.toHaveBeenCalled();
+  settled = true;
+  for (const listener of listeners) listener();
+  for (const listener of listeners) listener();
+  expect(service.pluginsStarted()).toBe(true);
+  expect(heard).toHaveBeenCalledTimes(1);
+});
+
 it("asks the first plugin that recommends, and waits for plugins to start before using the build's setup", async () => {
   // Synthetic candidates; real ones come only from a packager's plugin.
   const ORG = { harness: "codex", model: "model-z", effort: "low", label: "Z" };
@@ -3452,12 +3485,24 @@ it("asks the first plugin that recommends, and waits for plugins to start before
     });
     await Promise.resolve();
     expect(ready).toBe(false);
-    answer({ recommendedBy: "Example Org", candidates: [ORG] });
+    // Synthetic copy: an offer rides beside the setup.
+    const offer = {
+      mode: "optInPrompt",
+      copy: {
+        title: "Switch?",
+        body: "{agent} uses {model}.",
+        acceptLabel: "Yes",
+        optOutLabel: "No",
+      },
+      excludeWords: ["Model"],
+    };
+    answer({ recommendedBy: "Example Org", candidates: [ORG], cutover: offer });
     await waiting;
     expect(recommendedSetup()).toEqual({
       recommendedBy: "Example Org",
       candidates: [ORG],
     });
+    expect(cutoverOffer()).toEqual(offer);
     // The setup is final: a later call is ignored.
     first.owner("org.late").agents.recommend(other);
     expect(other).not.toHaveBeenCalled();
@@ -3497,6 +3542,7 @@ it("asks the first plugin that recommends, and waits for plugins to start before
     expect(recommendedSetup().candidates).toEqual([]);
   } finally {
     setRuntimeRecommendation(undefined);
+    setCutoverOffer(undefined);
     warn.mockRestore();
   }
 });

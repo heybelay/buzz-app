@@ -179,6 +179,88 @@ finding what one runs on. No answer, a failure, an invalid setup, or a late one
 keeps this setting's for that launch, so set `BUZZ_RECOMMENDED_AGENT` too, as
 the fallback.
 
+### One-time switch to Automatic
+
+The same bundled plugin may offer, once, to switch someone's agent to
+Automatic, for people whose agent looks like it was never set up on purpose.
+It decides who is offered it, how it is shown (`mode`) and every word of it;
+Buzz ships no wording for it beyond generic defaults for two optional
+labels, and open-source builds have no such plugin and never show it. Buzz decides at
+most once per launch, within 30 seconds of the setup being final and only
+after plugin start-up is over (so every agent type is registered; agents of a
+harness plugin that failed to start count as not set up here), and shows
+it only when all of these hold (`cutoverMatch` in
+`src/features/agents/cutover.ts`, the one place for these rules):
+
+- the person has exactly one agent that can be switched (one pubkey, in any
+  community): hosted agents, and agents on a harness Automatic doesn't cover,
+  aren't counted, and neither are agents that aren't set up on this computer
+  (a type it doesn't know). Agents on another computer in the selected
+  community are counted. That one agent runs on this computer on a local harness
+  (Codex, Claude Code or goose) that has a recommended candidate, and that
+  harness says now that it can run one;
+- the agent is not on Automatic already, and its name has none of Buzz's own
+  list of model and harness names (such as Codex, Claude, goose, Pi, GPT,
+  Sol, Terra, Opus, Sonnet and Gemini) or the offer's `excludeWords`, which
+  add to that list (case-insensitive, as a word or followed by digits, such
+  as `GPT` in “GPT helper” or “gpt5”), and nothing like a version number
+  (`6.1`, `v2`);
+- its settings sync on a config channel and this device has them, so an
+  answer from another device is usually seen first (after a restart, this
+  device may still hold its own earlier copy until the live one arrives;
+  a save against a stale copy is refused, so nothing is overwritten); and
+  it was never answered. An agent whose settings don't sync is never
+  offered it. Agents in a community that isn't connected aren't counted.
+
+It comes as a notification in the corner, one of two ways. Both recommend
+Automatic and show, beside the plugin's words, what
+the agent would run on (in `toastAutoApplied`, now runs on): the harness's
+mark, the model and its thinking level, as Create agent's Uses line shows
+them (“GPT 6.1 Sol · High”), from the candidate this computer can run in
+this launch's recommended setup. The offer's copy is `{title, body,
+acceptLabel, optOutLabel, usesLabel?, dismissLabel?}`, plain text in which
+`{agent}` and `{model}` are filled in; the optional labels default to “Uses”
+and “Dismiss”. Any other `mode` is invalid, so no offer shows.
+
+| `mode` | Shown as | Automatic (the prominent button) | Opt out | Dismissing |
+|---|---|---|---|---|
+| `toastAutoApplied` | a notification, once the window is focused and the switch is saved as `auto_accepted` | keeps it | puts its previous model settings back: `declined` | keeps it |
+| `optInPrompt` | a notification; nothing changes first | switches: `accepted` | no change: `declined` | no change: `declined` |
+
+A switch saves the agent on Automatic through the usual save, so the mark and
+`preset` tag sync as above, and keeps its previous model, provider and
+thinking level in the answer, so it can be undone. A save that fails or
+takes over 15 seconds counts as failed: a switch then shows why, and
+dismissing closes it without an answer so a later launch asks again. A save
+that only finished late still lands, so the person gets what they chose, and
+nothing else is saved until it does. An opt-out that changed nothing closes
+even if its save failed; nothing is recorded then, so a later launch asks
+again. In `toastAutoApplied`, once matched (within the 30 seconds), the
+switch waits for the first time that launch the Buzz window is focused and
+showing, whenever that is, so the switch and its notification come
+together; if the app quits first, nothing is saved and a later launch
+decides again. Just before it switches, it checks the rules again, and that
+the agent's settings haven't changed since it matched and its harness can
+still run the recommended model. Its save has no time limit, since nobody
+waits on it; one that fails shows nothing and records nothing. One answer is
+saved at a time, and the notification can't be closed while it saves. If
+the agent is answered or
+switched elsewhere while it is open, it closes for the launch, and a remount
+in the same launch keeps what was shown.
+
+Every answer is recorded on the agent as `cutover` beside `preset` in its
+`buzz.agent.settings` content, with when (ISO 8601) and how it was asked:
+`{"answer":"accepted","at":"2026-11-14T17:00:00.000Z","mode":"optInPrompt","previous":{…}}`,
+so other devices never ask again. `answer` is `accepted`, `auto_accepted` or
+`declined`. A revision whose content has it carries a matching tag,
+`["cutover", "<answer>", "<mode>"]`, so answers can be counted by mode from
+tags alone. Like `preset`, versions without this keep the field when they
+edit; an edit whose config no longer holds it keeps the head's, and going
+back in History to before the answer keeps it (an older version's History
+revert does not). That saved answer is the only record: right after
+answering, nothing asks again in the same launch, and on a later launch the
+agent carries the answer.
+
 ## Mobile app links
 
 Packagers that publish a Buzz mobile app can link its store listings:
