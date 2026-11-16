@@ -886,9 +886,11 @@ and are asked to sign in again in Buzz.
   and, when you are elsewhere, can open it (except a huddle). Your message and
   files are back in that conversation's composer. Do not
   promise support for every file type or size. In the desktop app, a file card
-  downloads to Downloads once and then opens that copy; right-click it to
-  **Show in Finder** (or **Show in folder**) or **Download again**. If the
-  saved file is moved, deleted or edited, the card offers **Download** again.
+  that downloads when chosen saves to Downloads once and then opens that copy;
+  right-click it to **Show in Finder** (or **Show in folder**) or **Download
+  again**. If the saved file is moved, deleted or edited, the card offers
+  **Download** again. A card that opens in the optional File viewer instead
+  has its own download button, which saves another copy each time.
 - **Emoji suggestions** appear when you type `:` and an emoji name. If a name
   is shortened with an ellipsis, hover over it or use the arrow keys to select
   it and see the full name in a tooltip. A chosen or picked emoji is followed
