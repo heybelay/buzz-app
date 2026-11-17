@@ -27,7 +27,7 @@ const reply = message(alice, "a", "Selected reply", 10000, [
 ]);
 const aux = (kind: number, target: RelayEvent, content = "", time = 10001) =>
   signed(alice, { kind, content, created_at: time, tags: [["e", target.id]] });
-function setup(id = reply.id) {
+function setup(id = reply.id, subthread = false) {
   const wire = scriptedTransport(viewer.pubkey, relay.pubkey);
   let traffic!: LiveCallbacks;
   const owner = createRelaySession({
@@ -42,7 +42,7 @@ function setup(id = reply.id) {
     ...wire,
     ...owner,
     traffic,
-    view: owner.session.thread("a", id, { exact: true }),
+    view: owner.session.thread("a", id, { exact: true, subthread }),
   };
 }
 async function targetRead(
@@ -865,4 +865,36 @@ it("a candidate rejected by final admission never establishes a thread identity"
   } finally {
     thread.view.dispose();
   }
+});
+
+it("projects a task branch while retaining source reads and live isolation", async () => {
+  const h = setup(reply.id, true);
+  const child = message(alice, "a", "Task reply", 10001, [
+    ["e", root.id, "", "root"],
+    ["e", reply.id, "", "reply"],
+  ]);
+  const nested = message(alice, "a", "Nested task reply", 10002, [
+    ["e", root.id, "", "root"],
+    ["e", child.id, "", "reply"],
+  ]);
+  const unrelated = message(alice, "a", "Source chatter", 10003, [
+    ["e", root.id, "", "reply"],
+  ]);
+  const { loading } = await targetRead(h);
+  h.next().respond([root, child, nested, unrelated]);
+  await loading;
+  expect(h.view.snapshot().root?.id).toBe(reply.id);
+  expect(h.view.snapshot().replies.map((row) => row.id)).toEqual([
+    child.id,
+    nested.id,
+  ]);
+  h.traffic.receive([
+    message(alice, "a", "More chatter", 10004, [["e", root.id, "", "reply"]]),
+  ]);
+  expect(h.view.snapshot().replies.map((row) => row.id)).toEqual([
+    child.id,
+    nested.id,
+  ]);
+  h.view.dispose();
+  expect(h.view.snapshot().replies).toEqual([]);
 });

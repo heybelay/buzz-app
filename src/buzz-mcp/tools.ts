@@ -1,3 +1,4 @@
+import { subthreadEvents } from "../features/relay/subthread";
 import { messageAuthor } from "../features/relay/fold";
 // The Buzz tools: what an agent does in Buzz, in the wire formats the `buzz`
 // CLI writes. Names, arguments and descriptions are kept short because every
@@ -667,7 +668,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
     // As relay ingest reads it: the last valid marker, in either case.
     const root = target
       ? (threadReference(target)?.rootId ?? target.id)
-      : parent;
+      : (context.sourceRoot ?? parent);
     return post(
       tools,
       channel,
@@ -873,11 +874,12 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
         {
           kinds: THREAD,
           "#h": [channel],
-          "#e": [root],
+          "#e": [root === context.root ? (context.sourceRoot ?? root) : root],
           limit: max + 1,
           ...cursor,
         },
-        ...(before === undefined
+        ...(before === undefined ||
+        (root === context.root && context.sourceRoot)
           ? [{ ids: [root], kinds: [...THREAD, 45001], limit: 1 }]
           : []),
       ]);
@@ -912,10 +914,15 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
     const shown = found.slice(0, max);
     const last = shown.at(-1);
     const lines = await tools.messages(
-      first ? [first, ...shown] : shown,
+      scope.root && scope.root === context.root && context.sourceRoot
+        ? subthreadEvents(first ? [first, ...shown] : shown, scope.root)
+        : first
+          ? [first, ...shown]
+          : shown,
       scope,
     );
-    if (!lines.length) return "No messages.";
+    if (!lines.length && !(scope.root === context.root && context.sourceRoot))
+      return "No messages.";
     const noun = scope.root ? "replies" : "messages";
     return [
       scope.root ? `thread ${scope.root} in ${channel}` : `channel ${channel}`,
@@ -1852,6 +1859,11 @@ class Tools {
   /** The e-tag of a `send` reply to `parent`: a reply to any message in a
    * thread is a reply to the thread's root. */
   async threadTags(parent: string) {
+    if (parent === this.context.root && this.context.sourceRoot)
+      return [
+        ["e", this.context.sourceRoot, "", "root"],
+        ["e", parent, "", "reply"],
+      ];
     const root =
       parent === this.context.root ? parent : rootOf(await this.event(parent));
     return [["e", root, "", "reply"]];

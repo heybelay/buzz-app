@@ -79,6 +79,8 @@ export type ThreadPanelProps = {
   soloConversation?: boolean | undefined;
   disabled?: boolean | undefined;
   messageId: string;
+  /** Display and compose only within this invocation's branch. */
+  subthreadId?: string | undefined;
   /** Channel workspaces retain the editor across same-thread link navigation. */
   retainThread?: boolean | undefined;
   /** The hosting tab strip owns the title, close and Escape. */
@@ -180,7 +182,7 @@ export function ThreadPanel(props: ThreadPanelProps) {
           </Button>
         </p>
       )}
-      {props.retainThread ? (
+      {props.retainThread && !props.subthreadId ? (
         <RetainedThreadPanel key={viewKey} {...props} />
       ) : (
         <OwnedThreadPanel key={viewKey} {...props} />
@@ -431,6 +433,7 @@ function OwnedThreadPanel({
   channelName,
   channelId,
   messageId,
+  subthreadId,
   navigation,
   onOpenLink,
   onOpenMediaReview,
@@ -457,12 +460,16 @@ function OwnedThreadPanel({
     try {
       if (navigation?.signal.aborted) return;
       const exact =
+        !!subthreadId ||
         requireReadyRoot ||
         revealSelected ||
         (navigation?.target.kind === "conversation" &&
           navigation.target.threadRootId !== messageId);
       const owned = exact
-        ? session.thread(channelId, messageId, { exact: true })
+        ? session.thread(channelId, messageId, {
+            exact: true,
+            ...(subthreadId ? { subthread: true } : {}),
+          })
         : session.thread(channelId, messageId);
       const cancel = () => {
         owned.dispose();
@@ -488,6 +495,7 @@ function OwnedThreadPanel({
     session,
     channelId,
     messageId,
+    subthreadId,
     attempt,
     navigation,
     revealSelected,
@@ -2303,9 +2311,12 @@ function ThreadMessages({
           channelId={channelId}
           channelName={channelName}
           placeholder={replyPlaceholder(composerRoot)}
-          threadRootId={composerRoot.id}
+          threadRootId={composerRoot.threadRootId ?? composerRoot.id}
           threadSeed={threadSeed}
-          replyParentId={replyParent}
+          replyParentId={
+            replyParent ??
+            (composerRoot.threadRootId ? composerRoot.id : undefined)
+          }
           disabled={
             disabled ||
             (requireReadyRoot &&

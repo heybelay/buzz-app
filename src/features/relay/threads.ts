@@ -1,3 +1,4 @@
+import { subthreadMessages } from "./subthread";
 import { isRetryableRead, retryRead } from "./read-retry";
 import {
   canonicalChannel,
@@ -131,6 +132,7 @@ export function createThreadView({
   visible,
   notify,
   exact = false,
+  subthread = false,
   priority = "foreground",
   admit = (events) => events,
   clock = new MessageClock(),
@@ -156,6 +158,8 @@ export function createThreadView({
   visible(events: readonly RelayEvent[]): readonly RelayEvent[];
   notify(listener: () => void): void;
   exact?: boolean;
+  /** Keep the source reader and project only the selected invocation branch. */
+  subthread?: boolean;
   /** Admission for every read this view makes. A passive reader, one that
    * only decorates a link, takes `background` so an opened or previewed
    * conversation's reads start ahead of it. */
@@ -351,7 +355,7 @@ export function createThreadView({
     const deliveries = new Map(operations.map((item) => [item.event.id, item]));
     const looked = new Map<string, string | undefined>();
     owners = looked;
-    const rows = shareMessageRows(
+    const sourceRows = shareMessageRows(
       snapshot.root ? [snapshot.root, ...snapshot.replies] : snapshot.replies,
       foldMessages(
         channelId,
@@ -379,6 +383,10 @@ export function createThreadView({
           : row;
       }),
     );
+    const rows = subthread
+      ? subthreadMessages(sourceRows, messageId)
+      : sourceRows;
+    const displayedRoot = subthread ? messageId : rootId;
     const target =
       targetStatus === "ready"
         ? rows.find((row) => row.id === messageId)
@@ -390,13 +398,14 @@ export function createThreadView({
     const nextReplies = readable
       .filter(
         (row) =>
-          row.id !== rootId && (!rootUnavailable || row.id === messageId),
+          row.id !== displayedRoot &&
+          (!rootUnavailable || row.id === messageId),
       )
       .sort(compareMessages);
     for (const row of nextReplies)
       clock.observe(channelId, row.createdAtMs ?? row.createdAt * 1000);
     let nextRoot = !rootUnavailable
-      ? readable.find((row) => row.id === rootId)
+      ? readable.find((row) => row.id === displayedRoot)
       : undefined;
     if (shown && !rootUnavailable) {
       // Evidence wins. A resumed row fills in only an event not read yet, and

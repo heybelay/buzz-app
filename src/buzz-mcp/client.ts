@@ -207,6 +207,8 @@ export type Context = Readonly<{
   session?: import("../features/agents/session-admission").AgentSessionAssociation;
   channel?: string;
   root?: string;
+  /** The physical thread when root is an invocation subthread. */
+  sourceRoot?: string;
   topLevel?: boolean;
   wholeChannel?: boolean;
 }>;

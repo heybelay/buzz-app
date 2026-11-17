@@ -9,6 +9,7 @@ import {
   type AgentSessionRouter,
   type AgentSessionAssociation,
   type AgentSessionSource,
+  type InvocationSubthread,
 } from "./session-admission";
 import type {} from "../navigation/service";
 import {
@@ -766,6 +767,13 @@ export type Delivery<Config = unknown> = Readonly<{
   trigger: Trigger;
   session?: AgentSessionAssociation;
   sessionContext?: string;
+  /** Resolve an opt-in task subthread after authority and chat-scope checks. */
+  routeConversation?(
+    placement: Readonly<{
+      source: AgentSessionSource;
+      conversation: AgentSessionSource;
+    }>,
+  ): Promise<InvocationSubthread | undefined>;
   /** The native adapter calls this after authority and conversation checks. */
   prepareSession?(
     placement: Readonly<{
@@ -842,6 +850,8 @@ export type SessionControlAction = SessionAction | "interrupt";
 export type SessionPlace = Readonly<{
   channelId: string;
   root?: string;
+  /** Host-resolved invocation task, independent of the agent's default scope. */
+  isolated?: true;
 }>;
 export type SessionState = "idle" | "active" | "compacting" | "unavailable";
 export type AgentMigrationSetting = Readonly<{
@@ -1410,6 +1420,7 @@ export type NewAgent = Readonly<{
   config?: unknown;
 }>;
 export type Agents = {
+  readonly invocationSubthreads?: true;
   registerSessionRouter(router: AgentSessionRouter): void;
   registerExecution(provider: AgentExecutionProvider): void;
   /** Select the adapter while the agent is idle. This is write-once. */
@@ -2044,6 +2055,7 @@ const wssOf = (origin: string) =>
 
 export class AgentsService extends Service implements Agents {
   private readonly sessionAdmissions;
+  readonly invocationSubthreads = true as const;
   registerSessionRouter(router: AgentSessionRouter) {
     this.sessionAdmissions.register(this.ctx, router);
   }
@@ -2365,6 +2377,18 @@ export class AgentsService extends Service implements Agents {
     /** The catch-up progress this program last read or saved. */
     let savedProgress: Checkpoints = {};
     this.runners = new AgentRunners({
+      routeConversation: (agent, type, trigger, placement, signal) =>
+        this.sessionAdmissions.route({
+          agent: agent.key,
+          owner: agent.owner,
+          harness: type.key,
+          ...placement,
+          invocationId:
+            trigger.type === "mention" ? trigger.event.id : trigger.id,
+          ...(trigger.type === "mention" ? { event: trigger.event } : {}),
+          resumed: trigger.type === "mention" && !!trigger.resumed,
+          signal,
+        }),
       prepareSession: async (agent, type, trigger, placement, signal) => {
         if (
           !type.sessionAdmission ||
@@ -4996,13 +5020,23 @@ export class AgentsService extends Service implements Agents {
     source: SessionPlace,
   ): SessionPlace {
     const summary = this.channelOf(agent, { tags: [["h", source.channelId]] });
+    const isolated = this.sessionAdmissions.routed(
+      agent.key,
+      agent.type,
+      source,
+    );
     const whole =
       summary?.channelType === "solo" ||
       summary?.channelType === "dm" ||
-      type.sessionControls?.scope(agent) === "channel";
+      (!isolated && type.sessionControls?.scope(agent) === "channel");
     return {
       channelId: source.channelId,
-      ...(!whole && source.root ? { root: source.root } : {}),
+      ...(!whole && source.root
+        ? {
+            root: source.root,
+            ...(isolated ? { isolated: true as const } : {}),
+          }
+        : {}),
     };
   }
   sessionState(key: AgentKey, place: SessionPlace): SessionState {

@@ -1,3 +1,4 @@
+import { subthreadEvents } from "../../features/relay/subthread";
 import { protectionTranscript } from "./protection-transcript";
 import type { PRESET } from "../../features/agents/recommended";
 import { fileStore } from "../../features/agents/state";
@@ -11,6 +12,7 @@ import { executionSpawn } from "./execution";
 // the in-process Buzz tools, signed by the agent's native-held key; the runtime
 // only reports a turn that fails.
 import type { Context } from "../../buzz-mcp/client";
+import type { InvocationSubthread } from "../../features/agents/session-admission";
 import { RESUMED_PROMPT } from "../../buzz-mcp/prompt";
 import { type Listing, respond } from "../../buzz-mcp/rpc";
 import {
@@ -805,7 +807,8 @@ export class ClaudeRuntime {
   }
   private readonly controls = new SessionControls(() => this.notify());
   private controlKey(agent: Agent, place: SessionPlace) {
-    return config(agent.config).scope === "channel" || !place.root
+    return (config(agent.config).scope === "channel" && !place.isolated) ||
+      !place.root
       ? place.channelId
       : `${place.channelId}/${place.root}`;
   }
@@ -1014,27 +1017,37 @@ export class ClaudeRuntime {
     if (wake && !wakeLands(wake, topLevel)) return ignored?.();
     // Frozen with the policy: a scope change while this waits must not move
     // its prompt to another conversation than the one it is delivered to.
-    const { key, source } = await this.key(
-      entry,
-      agent,
-      event,
-      channel,
-      topLevel,
-    );
+    const native = await this.key(entry, agent, event, channel, topLevel);
+    const route =
+      !solo && !topLevel && native.source.root
+        ? await delivery.routeConversation?.({
+            source: native.source,
+            conversation: {
+              channelId: channel,
+              ...(native.key !== channel ? { root: native.source.root } : {}),
+            },
+          })
+        : undefined;
+    const key = route ? `${channel}/${route.parent}` : native.key;
+    const source = route
+      ? { channelId: channel, root: route.parent }
+      : native.source;
+    const replyRoot =
+      route?.parent ?? threadReference(event)?.rootId ?? event.id;
     const admission = (deferred: boolean) =>
       delivery.prepareSession?.(
         {
           source: wake
             ? {
                 channelId: channel,
-                ...(source.root && wake.root ? { root: wake.root } : {}),
+                ...(source.root && wake.root
+                  ? { root: route?.parent ?? wake.root }
+                  : {}),
               }
             : source,
           conversation: {
             channelId: channel,
-            ...(key !== channel
-              ? { root: threadReference(event)?.rootId ?? event.id }
-              : {}),
+            ...(key !== channel ? { root: replyRoot } : {}),
           },
         },
         deferred,
@@ -1099,6 +1112,7 @@ export class ClaudeRuntime {
             topLevel,
             fresh,
             solo,
+            route,
           );
           const text = turnPrompt({
             ...turn,
@@ -1137,10 +1151,7 @@ export class ClaudeRuntime {
           }
           // Plugins' notes wait until the turn is handed over, so one that
           // fails or is cancelled before then leaves them for the next.
-          const noteRoot =
-            key === channel
-              ? undefined
-              : (threadReference(event)?.rootId ?? event.id);
+          const noteRoot = key === channel ? undefined : replyRoot;
           const notes = agent.notes?.(channel, noteRoot) ?? [];
           const text = [
             sessionContext,
@@ -1158,7 +1169,8 @@ export class ClaudeRuntime {
                 ? { channel }
                 : {
                     channel,
-                    root: threadReference(event)?.rootId ?? event.id,
+                    root: replyRoot,
+                    ...(route ? { sourceRoot: route.root } : {}),
                   }),
           });
           delivered = entry.sessions.deliver(key, text, event.created_at, {
@@ -1192,9 +1204,7 @@ export class ClaudeRuntime {
                 .filter(Boolean)
                 .join("\n\n"),
             ...(contextRoot ? { contextRoot } : {}),
-            activityScope: topLevel
-              ? channel
-              : (threadReference(event)?.rootId ?? event.id),
+            activityScope: topLevel ? channel : replyRoot,
             ...(step ? { step } : {}),
             ...(acknowledged ? { acknowledged } : {}),
             ...(accepted ? { accepted } : {}),
@@ -1244,7 +1254,8 @@ export class ClaudeRuntime {
         });
         this.notify();
         this.watch(done, async (error) => {
-          if (error) await this.report(agent, channel, event, error, topLevel);
+          if (error)
+            await this.report(agent, channel, event, error, topLevel, route);
         });
         if (solo && named)
           void this.offerTitle(done, agent.key, key, settings.workspace, named);
@@ -1254,7 +1265,7 @@ export class ClaudeRuntime {
     workingUntil(handoff.done);
     void handoff.done
       .catch((error) =>
-        this.report(agent, channel, event, String(error), topLevel),
+        this.report(agent, channel, event, String(error), topLevel, route),
       )
       .catch((error) => console.warn("Claude handover failed", error));
   }
@@ -1382,6 +1393,7 @@ export class ClaudeRuntime {
     event: EventData,
     error: string,
     topLevel: boolean,
+    route?: InvocationSubthread,
   ) {
     return agent
       .publish({
@@ -1391,7 +1403,15 @@ export class ClaudeRuntime {
           ["h", channel],
           ...(topLevel
             ? []
-            : [["e", threadReference(event)?.rootId ?? event.id, "", "reply"]]),
+            : [
+                ...(route ? [["e", route.root, "", "root"]] : []),
+                [
+                  "e",
+                  route?.parent ?? threadReference(event)?.rootId ?? event.id,
+                  "",
+                  "reply",
+                ],
+              ]),
           ["p", agent.owner],
         ],
       })
@@ -1433,6 +1453,7 @@ export class ClaudeRuntime {
     topLevel: boolean,
     fresh = false,
     solo = topLevel,
+    route?: InvocationSubthread,
   ) {
     const reads = this.reads(agent.key);
     const [summary, memory] = await Promise.all([
@@ -1466,7 +1487,11 @@ export class ClaudeRuntime {
         const events = await reads.read(
           thread && !topLevel
             ? [
-                { ids: [rootId], "#h": [channelId], limit: 1 },
+                {
+                  ids: [...new Set([rootId, ...(route ? [route.parent] : [])])],
+                  "#h": [channelId],
+                  limit: route ? 2 : 1,
+                },
                 { kinds: CHAT, "#h": [channelId], "#e": [rootId], limit: 200 },
               ]
             : [{ kinds: CHAT, "#h": [channelId], limit: CONTEXT_LIMIT + 1 }],
@@ -1487,7 +1512,11 @@ export class ClaudeRuntime {
         console.warn("Claude could not read the conversation", error);
       }
     // A session already has its own replies; a new one is shown them too.
-    const unseen = earlier.filter(
+    const history =
+      route && event.id !== route.parent
+        ? subthreadEvents(earlier, route.parent)
+        : earlier;
+    const unseen = history.filter(
       (item) =>
         item.created_at > seen && (!seen || item.pubkey !== agent.pubkey),
     );
@@ -1534,7 +1563,14 @@ export class ClaudeRuntime {
         ...(summary?.name ? { name: summary.name } : {}),
         dm,
       },
-      ...(thread ? { thread } : {}),
+      ...(route
+        ? {
+            thread: { rootId: route.parent, parentId: route.parent },
+            sourceRoot: route.root,
+          }
+        : thread
+          ? { thread }
+          : {}),
       context: unseen,
       contextRoot,
       total: earlier.length + 1,

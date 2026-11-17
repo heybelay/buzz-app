@@ -107,6 +107,7 @@ type Request = {
   scope: string;
   /** Publish/activity root; unlike toolRoot, retained in DMs. */
   replyRoot?: string;
+  sourceRoot?: string;
   agent: AgentHandle;
   settings: Config;
   conversation: Conversation;
@@ -566,7 +567,7 @@ export class CodexRuntime {
   private controlKey(agent: Agent, place: SessionPlace) {
     return JSON.stringify([
       place.channelId,
-      this.resolveConfig(agent.config).scope === "channel"
+      this.resolveConfig(agent.config).scope === "channel" && !place.isolated
         ? "channel"
         : (place.root ?? "channel"),
     ]);
@@ -730,7 +731,7 @@ export class CodexRuntime {
         agent.key,
         {
           channelId: place.channelId,
-          ...(settings.scope === "channel" || !place.root
+          ...((settings.scope === "channel" && !place.isolated) || !place.root
             ? {}
             : { root: place.root }),
         },
@@ -1738,11 +1739,30 @@ export class CodexRuntime {
     // A stop during the reads deleted this agent's entry; recreating it would
     // reopen the agent.
     delivery.signal.throwIfAborted();
-    const toolRoot = channel?.dm || topLevel ? undefined : rootOf(event);
-    const root = settings.scope === "channel" ? undefined : toolRoot;
+    const route =
+      !channel?.dm && !topLevel
+        ? await delivery.routeConversation?.({
+            source: {
+              channelId,
+              ...(wake?.root
+                ? { root: wake.root }
+                : !wake
+                  ? { root: rootOf(event) }
+                  : {}),
+            },
+            conversation: {
+              channelId,
+              ...(settings.scope !== "channel" ? { root: rootOf(event) } : {}),
+            },
+          })
+        : undefined;
+    const toolRoot =
+      channel?.dm || topLevel ? undefined : (route?.parent ?? rootOf(event));
+    const root =
+      route?.parent ?? (settings.scope === "channel" ? undefined : toolRoot);
     delivery.signal.throwIfAborted();
     const conversationKey = JSON.stringify([channelId, root ?? "channel"]);
-    const sourceRoot = wake ? wake.root : rootOf(event);
+    const sourceRoot = route?.parent ?? (wake ? wake.root : rootOf(event));
     const admission = (deferred: boolean) =>
       delivery.prepareSession?.(
         {
@@ -1805,7 +1825,8 @@ export class CodexRuntime {
       scope: reads.scope,
       ...(wake ? { current: delivery.current } : {}),
       event,
-      ...(!topLevel ? { replyRoot: rootOf(event) } : {}),
+      ...(!topLevel ? { replyRoot: route?.parent ?? rootOf(event) } : {}),
+      ...(route ? { sourceRoot: route.root } : {}),
       ...(wake ? { wake } : {}),
       ...(delivery.wakeText ? { wakeText: delivery.wakeText } : {}),
       agent,
@@ -1822,6 +1843,7 @@ export class CodexRuntime {
         channelId,
         name: channel?.name ?? channelId,
         ...(root ? { root } : {}),
+        ...(route ? { sourceRoot: route.root } : {}),
         ...(topLevel ? { topLevel } : {}),
         ...(topLevel && !solo && !huddle ? { threadReplies: true } : {}),
       },
@@ -2362,7 +2384,12 @@ export class CodexRuntime {
       tags: [
         ["h", request.conversation.channelId],
         ...(request.replyRoot !== undefined
-          ? [["e", request.replyRoot, "", "reply"]]
+          ? [
+              ...(request.sourceRoot
+                ? [["e", request.sourceRoot, "", "root"]]
+                : []),
+              ["e", request.replyRoot, "", "reply"],
+            ]
           : []),
         ["p", request.agent.owner],
       ],
@@ -2451,6 +2478,7 @@ export class CodexRuntime {
           ...(request.session ? { session: request.session } : {}),
           channel: request.conversation.channelId,
           ...(request.toolRoot ? { root: request.toolRoot } : {}),
+          ...(request.sourceRoot ? { sourceRoot: request.sourceRoot } : {}),
           ...(request.toolRoot && !request.conversation.root
             ? { wholeChannel: true }
             : {}),

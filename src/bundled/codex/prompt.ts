@@ -30,6 +30,8 @@ export type Conversation = {
   channelId: string;
   name: string;
   root?: string;
+  /** Physical thread retained when root is an invocation task. */
+  sourceRoot?: string;
   topLevel?: true;
   /** A channel-level default, without the Solo chat reply restriction. */
   threadReplies?: true;
@@ -116,7 +118,13 @@ export function turnInput(
   const body = wake ? wakeSection(wake) : eventBody(event, text, names);
   const routing = conversation.topLevel
     ? { posting: "top-level" }
-    : { session_thread: conversation.root, reply_to: rootOf(event) };
+    : {
+        session_thread: conversation.root,
+        reply_to: conversation.sourceRoot ? conversation.root : rootOf(event),
+        ...(conversation.sourceRoot
+          ? { source_thread: conversation.sourceRoot }
+          : {}),
+      };
   return `<context>\n${quoted({ agent, channel_id: conversation.channelId, channel_name: conversation.name, session_scope: conversation.root ? "thread" : "channel", ...routing })}\n</context>\n${conversation.topLevel ? `${conversation.threadReplies ? CHANNEL_LEVEL_PROMPT : TOP_LEVEL_PROMPT}\n` : ""}${wake ? "" : `${MENTION_PROMPT}\n`}${wake && !steering ? body : `<${section}>\n${body}\n</${section}>`}${note ? `\n\n${note}` : ""}`;
 }
 /** The readable part of a conversation's thread name; earlier versions used

@@ -514,6 +514,7 @@ export function PageTabs({
                             key={JSON.stringify(primaryTarget)}
                             tab={primaryTab}
                             intro={workspace.intro}
+                            subthreadId={primaryTarget?.subthreadId}
                             active={
                               secondary.selectedMain === "conversation" &&
                               !covered

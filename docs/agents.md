@@ -80,6 +80,40 @@ as the native reset. A failed reset blocks admission until New succeeds.
 Claude and Codex implement this contract. With no router and
 no saved association, the extension adds no execution or publication work.
 
+### Invocation subthreads
+
+Hosts with `ctx.agents.invocationSubthreads === true` support an optional
+`registerSessionRouter({ route })` callback. It runs after authority and chat
+scope checks, before the harness selects its session. Solo and DMs bypass it.
+The input contains `agent`, `owner`, `harness`, `source`, `conversation`,
+`invocationId`, optional original signed `event`, `resumed`, and `signal`.
+Retries and rooted wakes also receive `savedRoute` when this device has a binding.
+
+Return `{ root, parent }` to use `parent` as the invocation task anchor inside
+physical thread `root`. The host saves that route before execution. The route
+cannot change on retry or resume. Channel-scoped agents get a separate session
+for each selected task. The later association hook receives the task anchor in
+both `source.root` and `conversation.root`. Default sends and failure replies
+retain the physical root and use the invocation as their reply parent. Explicit
+other destinations retain their existing behavior. Prompts retain source context
+for the initial request and identify the source thread for later reads.
+
+Return `undefined` only for a positively unrouted turn. Throw on incomplete
+ancestry or unconfirmed task publication; rejection stops admission without a
+fallback to the source session. The plugin owns task ancestry and shared binding
+publication. It must confirm that binding before returning a new route.
+Local host receipts do not establish cross-device task identity. Existing admitted
+invocations keep their previous placement. Older plugins without `route` keep
+the existing behavior.
+
+A page-owned `Workspace` can select `{ channelId, threadId: sourceRoot,
+subthreadId: invocationId }`. It shows and composes within that branch. The
+existing source reader still owns access, edits, deletions, paging, and limits.
+Only verified available descendant chains appear. Paging can scan unrelated
+source replies; a history limit does not establish complete task history.
+The source conversation keeps its existing collapsed-branch default, manual
+expansion, and explicit-message reveal behavior.
+
 ## Local lifecycle evidence
 
 `session.agentActivity.snapshot().local` can include `LocalWork.evidence`.

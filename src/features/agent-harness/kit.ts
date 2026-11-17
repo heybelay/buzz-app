@@ -1,3 +1,4 @@
+import { subthreadEvents } from "../relay/subthread";
 // The Buzz side of an agent turn, for a harness a plugin brings: whether a
 // delivery is the harness's to act on and which conversation it goes to, the
 // prompts the bundled harnesses give, the agent's Buzz tools as an MCP
@@ -47,6 +48,7 @@ export type HarnessConversation = Readonly<{
   channel: string;
   /** The thread's root, when the conversation is one thread. */
   root?: string;
+  sourceRoot?: string;
   /** Replies go at the channel's top level, as in a Solo chat. */
   topLevel: boolean;
   /** `#name`, `DM` or a short channel id, for titles. */
@@ -208,7 +210,7 @@ export function harnessKit(sources: Sources): HarnessKit {
 
   return Object.freeze({
     async conversation(
-      { trigger, agent, channelId, signal }: Delivery,
+      { trigger, agent, channelId, signal, routeConversation }: Delivery,
       scope: HarnessScope,
     ) {
       if (
@@ -242,12 +244,31 @@ export function harnessKit(sources: Sources): HarnessKit {
       if (wake && !wakeLands(wake, topLevel)) return undefined;
       const found = summary(agent.key, channel);
       const dm = found?.channelType === "dm";
-      const root = threadReference(event)?.rootId ?? event.id;
-      const whole = topLevel || dm || scope === "channel";
+      const nativeRoot = threadReference(event)?.rootId ?? event.id;
+      const route =
+        !topLevel && !dm
+          ? await routeConversation?.({
+              source: {
+                channelId: channel,
+                ...(wake
+                  ? wake.root
+                    ? { root: wake.root }
+                    : {}
+                  : { root: nativeRoot }),
+              },
+              conversation: {
+                channelId: channel,
+                ...(scope === "thread" ? { root: nativeRoot } : {}),
+              },
+            })
+          : undefined;
+      const root = route?.parent ?? nativeRoot;
+      const whole = topLevel || dm || (!route && scope === "channel");
       const conversation: HarnessConversation = Object.freeze({
         key: whole ? channel : `${channel}/${root}`,
         channel,
         ...(whole ? {} : { root }),
+        ...(route ? { sourceRoot: route.root } : {}),
         topLevel,
         where: found?.name ? `#${found.name}` : dm ? "DM" : channel.slice(0, 8),
       });
@@ -325,7 +346,18 @@ export function harnessKit(sources: Sources): HarnessKit {
           const events = await ready.read(
             threadRead
               ? [
-                  { ids: [rootId], "#h": [channelId], limit: 1 },
+                  {
+                    ids: [
+                      ...new Set([
+                        rootId,
+                        ...(conversation.sourceRoot
+                          ? [conversation.root ?? event.id]
+                          : []),
+                      ]),
+                    ],
+                    "#h": [channelId],
+                    limit: conversation.sourceRoot ? 2 : 1,
+                  },
                   {
                     kinds: CHAT,
                     "#h": [channelId],
@@ -351,7 +383,13 @@ export function harnessKit(sources: Sources): HarnessKit {
           console.warn("A harness could not read the conversation", error);
         }
       // A session already has its own replies; a new one is shown them too.
-      const unseen = earlier.filter(
+      const history =
+        conversation.sourceRoot &&
+        conversation.root &&
+        event.id !== conversation.root
+          ? subthreadEvents(earlier, conversation.root ?? event.id)
+          : earlier;
+      const unseen = history.filter(
         (item) =>
           item.created_at > since && (!since || item.pubkey !== agent.pubkey),
       );
@@ -372,7 +410,17 @@ export function harnessKit(sources: Sources): HarnessKit {
         topLevel,
         channelLevel: topLevel && !solo,
         channel: { id: channelId, ...(name ? { name } : {}), dm },
-        ...(thread ? { thread } : {}),
+        ...(conversation.sourceRoot
+          ? {
+              thread: {
+                rootId: conversation.root ?? event.id,
+                parentId: conversation.root ?? event.id,
+              },
+              sourceRoot: conversation.sourceRoot,
+            }
+          : thread
+            ? { thread }
+            : {}),
         context: unseen,
         total: earlier.length + 1,
         names,
@@ -414,7 +462,13 @@ export function harnessKit(sources: Sources): HarnessKit {
               ...(solo ? { topLevel: true } : {}),
             }
           : conversation.root
-            ? { channel: conversation.channel, root: conversation.root }
+            ? {
+                channel: conversation.channel,
+                root: conversation.root,
+                ...(conversation.sourceRoot
+                  ? { sourceRoot: conversation.sourceRoot }
+                  : {}),
+              }
             : { channel: conversation.channel };
       const pubkey = agent.pubkey;
       const reads = () => ownerReads(sources.relay(agent.key), pubkey);
@@ -459,7 +513,19 @@ export function harnessKit(sources: Sources): HarnessKit {
           ["h", conversation.channel],
           ...(conversation.topLevel
             ? []
-            : [["e", threadReference(event)?.rootId ?? event.id, "", "reply"]]),
+            : [
+                ...(conversation.sourceRoot
+                  ? [["e", conversation.sourceRoot, "", "root"]]
+                  : []),
+                [
+                  "e",
+                  conversation.sourceRoot
+                    ? (conversation.root ?? event.id)
+                    : (threadReference(event)?.rootId ?? event.id),
+                  "",
+                  "reply",
+                ],
+              ]),
           ...(options.notifyOwner ? [["p", agent.owner]] : []),
         ],
       });

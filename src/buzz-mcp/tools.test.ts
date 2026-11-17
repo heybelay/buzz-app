@@ -5083,3 +5083,28 @@ it("addresses a new reaction to the actual message author and fails before publi
   ).rejects.toThrow("No message");
   expect(published).toHaveLength(1);
 });
+
+it("keeps ordinary routed sends in the task branch and preserves an explicit source reply", async () => {
+  const { client, published } = fake(community);
+  const context = { channel: "chan", root: nested, sourceRoot: root };
+  await callTool(client, context, "send", {
+    audience: "everyone",
+    text: "Task work",
+  });
+  await callTool(client, context, "send", {
+    audience: "everyone",
+    text: "Source",
+    reply: root,
+  });
+  expect(published.map((event) => event.tags)).toEqual([
+    [
+      ["h", "chan"],
+      ["e", root, "", "root"],
+      ["e", nested, "", "reply"],
+    ],
+    [
+      ["h", "chan"],
+      ["e", root, "", "reply"],
+    ],
+  ]);
+});

@@ -508,3 +508,42 @@ describe("harnessKit.tools", () => {
     );
   });
 });
+
+it.each(["thread", "channel"] as const)(
+  "isolates a routed %s harness and keeps its replies under the invocation",
+  async (scope) => {
+    const f = setup();
+    const event = reply("2", "1", "go");
+    const d = f.delivery(
+      { type: "mention", event },
+      {
+        routeConversation: async () => ({
+          root: "1".repeat(64),
+          parent: event.id,
+        }),
+      },
+    );
+    const first = await f.kit.conversation(d, scope);
+    if (!first) throw new Error("not admitted");
+    const next = await f.kit.conversation(
+      f.delivery(
+        { type: "mention", event: reply("3", "1", "continue") },
+        {
+          routeConversation: async () => ({
+            root: "1".repeat(64),
+            parent: event.id,
+          }),
+        },
+      ),
+      scope,
+    );
+    expect(first.key).toBe(`${channel}/${event.id}`);
+    expect(next?.key).toBe(first.key);
+    await f.kit.reply(f.agent, first, "Work");
+    expect(f.published[0]?.tags).toEqual([
+      ["h", channel],
+      ["e", "1".repeat(64), "", "root"],
+      ["e", event.id, "", "reply"],
+    ]);
+  },
+);

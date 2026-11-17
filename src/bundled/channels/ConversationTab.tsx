@@ -29,6 +29,7 @@ import styles from "./ChannelTabs.module.css";
 type ConversationTabProps = {
   tab: Tab;
   intro?: ReactNode;
+  subthreadId?: string | undefined;
   active: boolean;
   /** Showing the tab visits its conversation, as Channels does. */
   visit?: boolean | undefined;
@@ -55,6 +56,7 @@ type ConversationTabProps = {
 export function ConversationTab({
   tab,
   intro,
+  subthreadId,
   active,
   visit = true,
   focusOnMount = true,
@@ -166,7 +168,8 @@ export function ConversationTab({
           <ConversationThread
             intro={intro}
             active={active}
-            messageId={tab.messageId}
+            messageId={subthreadId ?? tab.messageId}
+            subthreadId={subthreadId}
             navigation={navigation}
             retainThread
             tabbed

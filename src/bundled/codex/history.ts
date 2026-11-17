@@ -1,3 +1,4 @@
+import { subthreadEvents } from "../../features/relay/subthread";
 import { readAuthorNames } from "../../features/agent-harness/author-names";
 import { quoted, withNames } from "../../features/agent-harness/turn-records";
 import { attestedOwner } from "../../features/agents/owner-attestation";
@@ -30,7 +31,7 @@ export async function conversationHistory(
     root
       ? [
           { ...filter, ids: [root], limit: 1 },
-          { ...filter, "#e": [root], limit: 50 },
+          { ...filter, "#e": [conversation.sourceRoot ?? root], limit: 50 },
         ]
       : [{ ...filter, limit: 50 }],
   );
@@ -41,7 +42,11 @@ export async function conversationHistory(
   };
   // The cutoff selects messages, not revisions. Apply current edits/deletions
   // so history agrees with the conversation rather than reviving replaced text.
-  const earlier = found.filter(
+  const history =
+    conversation.sourceRoot && root && event.id !== root
+      ? subthreadEvents(found, root)
+      : found;
+  const earlier = history.filter(
     (item) =>
       compareMessages(
         { id: item.id, createdAt: item.created_at, createdAtMs: eventMs(item) },
@@ -93,7 +98,10 @@ export async function conversationHistory(
   })
     .filter(
       (message) =>
-        !root || message.id === root || message.threadRootId === root,
+        !root ||
+        !!conversation.sourceRoot ||
+        message.id === root ||
+        message.threadRootId === root,
     )
     .slice(-50)
     .map((message) =>

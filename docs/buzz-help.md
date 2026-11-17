@@ -492,6 +492,11 @@ and are asked to sign in again in Buzz.
   again from the same source returns to its unsent draft. The link grants no
   access to the source; the agent you tag, and anyone you later share the chat
   with, can open it only if they can already read that conversation.
+- A task plugin on a supported host can keep an agent's work in a subthread
+  under the request that starts it. Replies and follow-ups stay with that task.
+  Its task view can show only that work and link back to the source conversation.
+  The work branch starts collapsed in the source thread. Expand it to read the
+  replies there. Existing tasks keep their original conversation.
 - **Team** contains community channels and their threads. Choose **Reply** on a
   message to open or continue its thread. Use the **@** picker
   to address a channel member. A full name typed after **@** and followed by

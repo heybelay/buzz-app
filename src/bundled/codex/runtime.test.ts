@@ -7958,3 +7958,57 @@ describe("a conversation given its own folder", () => {
     await vi.waitFor(() => expect(f.publish).toHaveBeenCalledTimes(1));
   });
 });
+
+it.each(["thread", "channel"])(
+  "keeps a routed %s agent's task session and reply placement",
+  async (scope) => {
+    const f = fixture();
+    const anchor = "d".repeat(64);
+    const routeConversation = async () => ({ root, parent: anchor });
+    const routed = (text: string) => {
+      const delivery = f.delivery(text);
+      return {
+        ...delivery,
+        config: { ...(delivery.config as object), scope },
+        routeConversation,
+      };
+    };
+    await f.runtime.run(routed("Start the task"));
+    await vi.waitFor(() => expect(f.starts()).toHaveLength(1));
+    await f.complete(0, "First task reply");
+    await f.runtime.run(routed("Continue the task"));
+    await vi.waitFor(() => expect(f.starts()).toHaveLength(2));
+    expect(
+      (f.starts()[1]?.params as { threadId?: string } | undefined)?.threadId,
+    ).toBe(
+      (f.starts()[0]?.params as { threadId?: string } | undefined)?.threadId,
+    );
+    await f.complete(1, "Second task reply");
+    expect(tagsOf(f)).toEqual([
+      [
+        ["h", "channel"],
+        ["e", root, "", "root"],
+        ["e", anchor, "", "reply"],
+      ],
+      [
+        ["h", "channel"],
+        ["e", root, "", "root"],
+        ["e", anchor, "", "reply"],
+      ],
+    ]);
+  },
+);
+
+it("does not start a native turn or publish when task routing rejects", async () => {
+  const f = fixture();
+  await expect(
+    f.runtime.run({
+      ...f.delivery("Task"),
+      routeConversation: async () => {
+        throw new Error("Task binding unavailable");
+      },
+    }),
+  ).rejects.toThrow("Task binding unavailable");
+  expect(f.starts()).toEqual([]);
+  expect(f.publish).not.toHaveBeenCalled();
+});
