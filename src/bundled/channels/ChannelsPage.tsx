@@ -971,6 +971,11 @@ function ChannelWorkspace({
       );
     if (!mentions.length || /[^\s,]/.test(rest))
       throw new Error("Mention who to invite, like /invite @name.");
+    // A DM adds people through its access dialog, which asks about history.
+    if (channel.channelType === "dm")
+      throw new Error(
+        "To add someone to this DM, click its name at the top and search for them.",
+      );
     if (!canAddMembers(queries, channel))
       throw new Error("You can’t add people to this conversation.");
     const people = [
@@ -979,6 +984,14 @@ function ChannelWorkspace({
     const added = people.filter(
       (person) => !channel.members?.includes(person.pubkey),
     );
+    // The owner's agents from other communities must be brought here first,
+    // which an ordinary send asks about.
+    const elsewhere = new Set(agents?.joinable().map((agent) => agent.pubkey));
+    const away = added.filter((person) => elsewhere.has(person.pubkey));
+    if (away.length)
+      throw new Error(
+        `${away.map((person) => person.name).join(", ")} ${away.length > 1 ? "are" : "is"} in your other communities. Mention ${away.length > 1 ? "them" : "it"} in a message to bring ${away.length > 1 ? "them" : "it"} here first.`,
+      );
     const failed = (
       await Promise.allSettled(
         added.map((person) =>

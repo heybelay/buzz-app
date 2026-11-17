@@ -776,7 +776,10 @@ and are asked to sign in again in Buzz.
 - In a channel's main message box, typing `/invite` followed by one or more
   @mentions adds those people or agents, as **Members** does, and a toast shows
   who was added. The command is not posted as a message. People already in the
-  channel are skipped. Thread replies send `/invite` as text.
+  channel are skipped. To add one of your agents from another community,
+  mention it in a normal message, which asks to bring it here first. To add
+  someone to a DM, use the DM's access dialog. Thread replies send `/invite` as
+  text.
 - Deleting the open Solo chat opens a neighboring Solo chat or a new draft while
   deletion finishes. The chat stays listed until deletion is confirmed. If it
   fails, a notice names the chat; you can reopen it from the sidebar.

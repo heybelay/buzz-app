@@ -17,6 +17,7 @@ import { ApiPaused } from "../../features/relay/http-admission";
 import { ChannelLifecycleUnconfirmed } from "../../features/relay/channel-lifecycle";
 import { keypair, signed } from "../../features/relay/testing";
 import type { RelayData } from "../../features/relay/service";
+import type { Agents } from "../../features/agents/service";
 import type {
   ChannelList,
   ChannelSummary,
@@ -87,9 +88,12 @@ function fixture({
   restored = false,
   muted,
   addable = true,
+  joinable,
 }: {
   /** The relay accepts member additions (kind 9000) on this connection. */
   addable?: boolean;
+  /** The owner's agents in their other communities that this one can bring. */
+  joinable?: readonly string[];
   /** Channels the viewer muted; enables sidebar mute writes when given. */
   muted?: readonly string[];
   sidebarRows?: readonly RegisteredSidebarRows[];
@@ -122,7 +126,7 @@ function fixture({
   departed?: boolean;
   /** Whether the viewer created the chat, rather than joining it as a guest. */
   placed?: boolean;
-  type?: "solo" | "stream";
+  type?: "solo" | "stream" | "dm";
   target?: (scope: string) => OpenTarget;
   /** Settings is open over this retained page. */
   behindSettings?: boolean;
@@ -514,6 +518,13 @@ function fixture({
         navigator={navigator}
         archive={archive}
         read={read}
+        {...(joinable
+          ? {
+              agents: {
+                joinable: () => joinable.map((pubkey) => ({ pubkey })),
+              } as unknown as Agents,
+            }
+          : {})}
       />
     </ChannelNavigationProvider>
   );
@@ -837,6 +848,14 @@ it.each([
     error: "You can’t add people to this conversation.",
   },
   {
+    why: "the agent is in the owner's other communities",
+    text: "/invite @Teammate",
+    addable: true,
+    joinable: true,
+    error:
+      "Teammate is in your other communities. Mention it in a message to bring it here first.",
+  },
+  {
     why: "the relay refuses the addition",
     text: "/invite @Teammate",
     addable: true,
@@ -845,9 +864,13 @@ it.each([
   },
 ])(
   "keeps /invite in the composer when $why",
-  async ({ text, addable, refused, error }) => {
-    const f = fixture({ type: "stream", addable });
+  async ({ text, addable, joinable, refused, error }) => {
     const person = "c".repeat(64);
+    const f = fixture({
+      type: "stream",
+      addable,
+      ...(joinable ? { joinable: [person] } : {}),
+    });
     if (refused)
       f.session.memberAdditions.add.mockRejectedValueOnce(
         new Error("Relay refused"),
@@ -871,6 +894,29 @@ it.each([
     expect(editor).toHaveValue(text);
   },
 );
+
+it("points /invite in a DM to the DM's own adding", async () => {
+  const f = fixture({ type: "dm" });
+  writeView(f.scope, `draft:${id}`, {
+    text: "/invite @Teammate",
+    recipients: [
+      { pubkey: "c".repeat(64), name: "Teammate", start: 8, end: 17 },
+    ],
+  });
+  f.mountWithToasts();
+  const editor = await screen.findByRole("textbox", { name: /^Message / });
+  const user = userEvent.setup();
+  await user.click(editor);
+  await user.keyboard("{Enter}");
+  expect(
+    await screen.findByText(
+      "To add someone to this DM, click its name at the top and search for them.",
+    ),
+  ).toBeInTheDocument();
+  expect(f.session.memberAdditions.add).not.toHaveBeenCalled();
+  expect(f.send).not.toHaveBeenCalled();
+  expect(editor).toHaveValue("/invite @Teammate");
+});
 
 it("keeps /invite in the composer until it mentions someone", async () => {
   const f = fixture({ type: "stream" });
