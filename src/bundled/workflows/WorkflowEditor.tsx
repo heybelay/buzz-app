@@ -169,7 +169,7 @@ export function WorkflowEditor({
         : chooseChannel
           ? "Choose a channel before editing."
           : !fields.editable
-            ? "Correct the YAML before changing the name or turning this workflow on or off."
+            ? "Correct the YAML before changing the name or enabling or disabling this workflow."
             : undefined));
   const enableReason = fields.enabled === false ? enableBlocked : undefined;
   // Run history is read only in the Runs tab, which replaces this row, so the

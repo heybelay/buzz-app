@@ -1241,9 +1241,8 @@ it("rereads the selected workflow's history after a created run", async () => {
   }
 });
 
-it("warns that turning off cancels nothing only while the run history on screen lists an unfinished run", async () => {
-  const caveat =
-    "Turning off only affects future runs. Runs already in progress are not cancelled.";
+it("warns that disabling cancels nothing only while the run history on screen lists an unfinished run", async () => {
+  const caveat = "Disabling won’t cancel runs already in progress.";
   const { fixture, target } = landing();
   const show = (
     status: "ready" | "loading" | "error",

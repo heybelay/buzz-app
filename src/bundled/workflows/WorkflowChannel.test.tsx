@@ -497,7 +497,7 @@ it("keeps a rejected save's and unreadable YAML's reasons ahead of the archived 
   );
   expect(
     within(reopened).getByText(
-      "Correct the YAML before changing the name or turning this workflow on or off.",
+      "Correct the YAML before changing the name or enabling or disabling this workflow.",
       { selector: "[role=status]" },
     ),
   ).toBeVisible();

@@ -337,8 +337,7 @@ it("delivers a late webhook secret on the landing page after confirmed navigatio
 });
 
 it("labels the landing switch Enabled and shows the in-progress caveat in the detail only while a run is unfinished", async () => {
-  const caveat =
-    "Turning off only affects future runs. Runs already in progress are not cancelled.";
+  const caveat = "Disabling won’t cancel runs already in progress.";
   const fixture = mount();
   expect(
     await screen.findByRole("switch", {
@@ -362,7 +361,7 @@ it("labels the landing switch Enabled and shows the in-progress caveat in the de
   expect(paneToggle).toHaveAccessibleDescription(caveat);
   expect(detailPane().getByText(caveat)).toBeVisible();
   // The list rows carry no caveat: it sits beside the detail's switch.
-  expect(screen.getAllByText(/Runs already in progress/)).toHaveLength(1);
+  expect(screen.getAllByText(/runs already in progress/)).toHaveLength(1);
   fireEvent.click(detailPane().getByRole("button", { name: "Edit workflow" }));
   expect(
     await screen.findByRole("region", { name: "Workflow editor" }),
@@ -373,7 +372,7 @@ it("labels the landing switch Enabled and shows the in-progress caveat in the de
   expect(
     dialog.getByRole("switch", { name: "Enabled" }),
   ).not.toHaveAccessibleDescription();
-  expect(dialog.queryByText(/Runs already in progress/)).toBeNull();
+  expect(dialog.queryByText(/runs already in progress/)).toBeNull();
 });
 
 it("explains another author's disabled controls from the landing through the read-only dialog", async () => {

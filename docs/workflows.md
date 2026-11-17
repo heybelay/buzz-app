@@ -64,7 +64,7 @@ See the [capability contract](../src/features/workflows/types.ts).
   saved configuration in one click and toggles its configured state. Selecting
   a row shows its detail, actions and run history in a resizable side pane, as
   on Agents; a created run rereads that history. The detail's Enabled switch
-  says that turning off does not cancel runs in progress only while the run
+  says that disabling does not cancel runs in progress only while the run
   page on screen lists a pending, running or waiting-approval run; history that
   is unread, failed or unavailable shows no caveat. The editor reads history
   only in its Runs tab, so its switch has none. Editing opens a modal over the

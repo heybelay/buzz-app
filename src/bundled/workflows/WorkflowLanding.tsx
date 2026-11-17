@@ -571,14 +571,14 @@ function WorkflowCard({
       : locked || awaitingReadback
         ? "Waiting for the submitted change to be resolved."
         : !fields.editable
-          ? "Correct the YAML before turning this workflow on or off."
+          ? "Correct the YAML before enabling or disabling this workflow."
           : !capability.availability.save
             ? "Saving is unavailable from this host."
             : undefined;
   const toggleDescription =
     toggleReason ??
     (runInProgress
-      ? "Turning off only affects future runs. Runs already in progress are not cancelled."
+      ? "Disabling won’t cancel runs already in progress."
       : undefined);
   const reasonId = useId();
   const archivedReasonId = useId();
