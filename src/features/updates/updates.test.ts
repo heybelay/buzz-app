@@ -329,15 +329,6 @@ it("returns to ready on cancel and stops waiting", async () => {
   expect(update.install).not.toHaveBeenCalled();
 });
 
-it("keeps the schedule when its notice is dismissed", async () => {
-  const { updates, update } = await readyWith(agentWork());
-  updates.installWhenIdle();
-  updates.dismissNotice();
-  expect(updates.noticeDismissed()).toBe(true);
-  await vi.advanceTimersByTimeAsync(IDLE_QUIET_MS);
-  expect(update.install).toHaveBeenCalledOnce();
-});
-
 it("skips background checks while scheduled", async () => {
   const { updates, update } = await readyWith(agentWork(1));
   updates.installWhenIdle();

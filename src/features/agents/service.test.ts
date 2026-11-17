@@ -9663,7 +9663,7 @@ it("counts a live event waiting on its watch's catch-up as work", async () => {
     });
     await settle();
     vi.setSystemTime((now + 60) * 1000);
-    const read = vi.mocked(session.read);
+    const read = vi.mocked(session.readRemote);
     const original = read.getMockImplementation() as NonNullable<
       ReturnType<typeof read.getMockImplementation>
     >;
@@ -9671,7 +9671,7 @@ it("counts a live event waiting on its watch's catch-up as work", async () => {
     const page = runnerGate();
     let first = true;
     read.mockImplementation(async (filters, options) => {
-      if (filters[0]?.kinds?.includes(9) && first) {
+      if (filters[0]?.kinds?.includes(9) && !filters[0]["#p"] && first) {
         first = false;
         reading.resolve(undefined);
         await page.promise;
