@@ -85,7 +85,10 @@ function fixture({
   member = false,
   emptyHistory = false,
   restored = false,
+  muted,
 }: {
+  /** Channels the viewer muted; enables sidebar mute writes when given. */
+  muted?: readonly string[];
   sidebarRows?: readonly RegisteredSidebarRows[];
   /** Observed unread messages in this chat; fakes the read state when given. */
   unread?: number;
@@ -272,6 +275,15 @@ function fixture({
     status: "reconciled" as const,
     completeness: "snapshot" as const,
   };
+  const preferences = {
+    status: "ready" as const,
+    data: { sections: [], assignments: {}, starred: [], muted: muted ?? [] },
+  };
+  const setMute = vi.fn(async (channel: string, mute: boolean) =>
+    mute
+      ? [...(muted ?? []), channel]
+      : (muted ?? []).filter((m) => m !== channel),
+  );
   const session = {
     ...owner.session,
     profiles: {
@@ -356,6 +368,16 @@ function fixture({
       },
     },
     messages: { ...owner.session.messages, send },
+    sidebarPreferences: muted
+      ? {
+          ...owner.session.sidebarPreferences,
+          muteWritable: true,
+          snapshot: () => preferences,
+          subscribe: () => () => {},
+          ensure: async () => {},
+          setMute,
+        }
+      : owner.session.sidebarPreferences,
     unread:
       unread === undefined
         ? owner.session.unread
@@ -677,6 +699,43 @@ it("turns /leave into the existing channel confirmation without posting it", asy
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(editor).toHaveFocus());
   expect(f.run).not.toHaveBeenCalled();
+});
+
+it.each([
+  { muted: [] as string[], next: true, toast: "Muted Planning" },
+  { muted: [id], next: false, toast: "Unmuted Planning" },
+])(
+  "toggles the channel mute with /mute without posting it (muted: $next)",
+  async ({ muted, next, toast }) => {
+    const f = fixture({ type: "stream", muted });
+    f.mountWithToasts();
+    const editor = await screen.findByRole("textbox", {
+      name: "Message Planning",
+    });
+    const user = userEvent.setup();
+    await user.type(editor, "/mute{Enter}");
+    expect(await screen.findByText(toast)).toBeInTheDocument();
+    expect(
+      f.session.sidebarPreferences.setMute,
+    ).toHaveBeenCalledExactlyOnceWith(id, next);
+    expect(f.send).not.toHaveBeenCalled();
+    expect(editor).toHaveValue("");
+  },
+);
+
+it("keeps /mute in the composer where mutes are unavailable", async () => {
+  const f = fixture({ type: "stream" });
+  f.mountWithToasts();
+  const editor = await screen.findByRole("textbox", {
+    name: "Message Planning",
+  });
+  const user = userEvent.setup();
+  await user.type(editor, "/mute{Enter}");
+  expect(
+    await screen.findByText("You can’t mute this conversation here."),
+  ).toBeInTheDocument();
+  expect(f.send).not.toHaveBeenCalled();
+  expect(editor).toHaveValue("/mute");
 });
 
 it("retires the Archive shortcut once the chat is archived", async () => {

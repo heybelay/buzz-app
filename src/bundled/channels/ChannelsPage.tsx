@@ -937,8 +937,31 @@ function ChannelWorkspace({
       },
     });
   };
+  const mute = handoff?.session === queries ? handoff.mute : undefined;
+  // `/mute` toggles the same optimistic sidebar mute as the row menu, which
+  // owns failure recovery. A not-joined preview has no row to mute.
+  const toggleMute = (channel: ChannelSummary) => {
+    if (
+      !mute ||
+      !preferences.data ||
+      !queries.sidebarPreferences.muteWritable ||
+      channel.cached ||
+      (channel.readOnly && channel.viewerRole !== "guest")
+    )
+      throw new Error("You can’t mute this conversation here.");
+    const intent = mute.intents.get(channel.id);
+    const muted = intent?.pending
+      ? intent.muted
+      : preferences.data.muted.includes(channel.id);
+    mute.change(channel.id, channel.name, !muted);
+    notify(`${muted ? "Unmuted" : "Muted"} ${channel.name}`, "success");
+    return true;
+  };
   const handleCommand = (command: string, signal: AbortSignal) => {
-    if (command.toLowerCase() !== "/leave" || !current || solo) return false;
+    if (!current || solo) return false;
+    const name = command.toLowerCase();
+    if (name === "/mute") return toggleMute(current);
+    if (name !== "/leave") return false;
     return (async () => {
       const permissions = await queries.channelLifecycle.load(
         current.id,
