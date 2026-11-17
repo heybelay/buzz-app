@@ -86,7 +86,10 @@ function fixture({
   emptyHistory = false,
   restored = false,
   muted,
+  addable = true,
 }: {
+  /** The relay accepts member additions (kind 9000) on this connection. */
+  addable?: boolean;
   /** Channels the viewer muted; enables sidebar mute writes when given. */
   muted?: readonly string[];
   sidebarRows?: readonly RegisteredSidebarRows[];
@@ -141,7 +144,7 @@ function fixture({
       media: () => undefined,
       query: async () => [],
       writer: {
-        kinds: [9, 9000],
+        kinds: addable ? [9, 9000] : [9],
         sign: async (event) => signed(viewer, event),
         publish: async () => {},
       },
@@ -769,6 +772,85 @@ it.each([
   expect(f.send).not.toHaveBeenCalled();
   expect(editor).toHaveValue("");
 });
+
+it("adds each mentioned person once with /invite, whatever their names", async () => {
+  const f = fixture({ type: "stream" });
+  const alice = "c".repeat(64);
+  const al = "d".repeat(64);
+  writeView(f.scope, `draft:${id}`, {
+    text: "/invite @Alice, @Al @Alice",
+    // Out of text order, so `@Al` is tried before `@Alice`.
+    recipients: [
+      { pubkey: al, name: "Al", start: 16, end: 19 },
+      { pubkey: alice, name: "Alice", start: 8, end: 14 },
+      { pubkey: alice, name: "Alice", start: 20, end: 26 },
+    ],
+  });
+  f.mountWithToasts();
+  const editor = await screen.findByRole("textbox", {
+    name: "Message Planning",
+  });
+  const user = userEvent.setup();
+  await user.click(editor);
+  await user.keyboard("{Enter}");
+  expect(
+    await screen.findByText("Added Al, Alice to Planning"),
+  ).toBeInTheDocument();
+  expect(f.session.memberAdditions.add.mock.calls).toEqual([
+    [id, al],
+    [id, alice],
+  ]);
+  expect(f.send).not.toHaveBeenCalled();
+});
+
+it.each([
+  {
+    why: "text follows the mentions",
+    text: "/invite @Teammate please",
+    addable: true,
+    error: "Mention who to invite, like /invite @name.",
+  },
+  {
+    why: "the viewer can't add members",
+    text: "/invite @Teammate",
+    addable: false,
+    error: "You can’t add people to this conversation.",
+  },
+  {
+    why: "the relay refuses the addition",
+    text: "/invite @Teammate",
+    addable: true,
+    refused: true,
+    error: "Relay refused",
+  },
+])(
+  "keeps /invite in the composer when $why",
+  async ({ text, addable, refused, error }) => {
+    const f = fixture({ type: "stream", addable });
+    const person = "c".repeat(64);
+    if (refused)
+      f.session.memberAdditions.add.mockRejectedValueOnce(
+        new Error("Relay refused"),
+      );
+    writeView(f.scope, `draft:${id}`, {
+      text,
+      recipients: [{ pubkey: person, name: "Teammate", start: 8, end: 17 }],
+    });
+    f.mountWithToasts();
+    const editor = await screen.findByRole("textbox", {
+      name: "Message Planning",
+    });
+    const user = userEvent.setup();
+    await user.click(editor);
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText(error)).toBeInTheDocument();
+    expect(f.session.memberAdditions.add).toHaveBeenCalledTimes(
+      refused ? 1 : 0,
+    );
+    expect(f.send).not.toHaveBeenCalled();
+    expect(editor).toHaveValue(text);
+  },
+);
 
 it("keeps /invite in the composer until it mentions someone", async () => {
   const f = fixture({ type: "stream" });

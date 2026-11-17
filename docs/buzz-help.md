@@ -771,7 +771,7 @@ and are asked to sign in again in Buzz.
 - In a channel, typing `/leave` by itself opens the same **Leave channel**
   confirmation. The command is not posted as a message.
 - In a channel, typing `/invite` followed by one or more @mentions adds those
-  people, as **Members** does, and a toast confirms it. The command is not
+  people or agents, as **Members** does, and a toast confirms it. The command is not
   posted as a message. People already in the channel are skipped.
 - Deleting the open Solo chat opens a neighboring Solo chat or a new draft while
   deletion finishes. The chat stays listed until deletion is confirmed. If it

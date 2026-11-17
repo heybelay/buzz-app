@@ -966,10 +966,13 @@ function ChannelWorkspace({
     command: string,
     mentions: readonly MentionRecipient[],
   ) => {
-    const rest = mentions.reduce(
-      (text, person) => text.replace(`@${person.name}`, ""),
-      command.slice("/invite".length),
-    );
+    // Longest names first, so `@Al` cannot match inside `@Alice`.
+    const rest = [...mentions]
+      .sort((a, b) => b.name.length - a.name.length)
+      .reduce(
+        (text, person) => text.replace(`@${person.name}`, ""),
+        command.slice("/invite".length),
+      );
     if (!mentions.length || /[^\s,]/.test(rest))
       throw new Error("Mention who to invite, like /invite @name.");
     if (!canAddMembers(queries, channel))
