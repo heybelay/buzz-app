@@ -361,6 +361,7 @@ function mount(
     },
     media: (url: string) => url,
     outbox: {
+      observeSend: () => () => {},
       ready: async () => {},
       recovery: async (key: string) =>
         pending.find((item) => item.recovery?.key === key),
