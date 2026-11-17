@@ -939,16 +939,12 @@ function ChannelWorkspace({
   };
   const mute = handoff?.session === queries ? handoff.mute : undefined;
   // `/mute` toggles the same optimistic sidebar mute as the row menu, which
-  // owns failure recovery. A not-joined preview has no row to mute.
+  // owns failure recovery.
   const toggleMute = (channel: ChannelSummary) => {
-    if (
-      !mute ||
-      !preferences.data ||
-      !queries.sidebarPreferences.muteWritable ||
-      channel.cached ||
-      (channel.readOnly && channel.viewerRole !== "guest")
-    )
+    if (!mute || !queries.sidebarPreferences.muteWritable || channel.cached)
       throw new Error("You can’t mute this conversation here.");
+    if (!preferences.data)
+      throw new Error("Mute settings aren’t loaded yet. Try /mute again.");
     const intent = mute.intents.get(channel.id);
     const muted = intent?.pending
       ? intent.muted
