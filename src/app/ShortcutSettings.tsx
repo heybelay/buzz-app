@@ -38,7 +38,7 @@ import {
 } from "../features/messages/send-key-preference";
 import type { PluginManager } from "../plugins/manager";
 import { editKeyPreference } from "../features/messages/edit-key-preference";
-import { conversationFeatureManifests } from "./conversation-feature-manifests";
+import { conversationFeatures } from "./conversation-features";
 
 type Row = Readonly<{
   key: string;
@@ -209,9 +209,8 @@ function useShortcutGroups({
   // Host-owned features contribute without a catalog entry, and the manager
   // never activates a catalog entry under one's id, so their manifests go first.
   const pluginName = (id: string) =>
-    Object.values(conversationFeatureManifests).find(
-      (manifest) => manifest.id === id,
-    )?.name ??
+    conversationFeatures.find(({ manifest }) => manifest.id === id)?.manifest
+      .name ??
     (configuration.status === "ready"
       ? configuration.catalog.plugins.find(
           (plugin) => plugin.manifest.id === id,
