@@ -243,6 +243,7 @@ export function DraftPreview({
           {entry.threadRootId ? (
             <ConversationThread
               messageId={mode === "sent" ? entry.id : entry.threadRootId}
+              subthreadId={mode === "draft" ? entry.threadRootId : undefined}
               revealSelected={mode === "sent"}
               revealFocus={false}
               requireReadyRoot={mode === "draft"}

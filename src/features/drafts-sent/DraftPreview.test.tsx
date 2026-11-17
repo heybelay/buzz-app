@@ -23,6 +23,7 @@ import type { ComposerInputElement } from "../messages/composer-dom";
 import { attachmentDraft } from "../messages/attachment-draft";
 import type { UploadedAttachment } from "../relay/attachments";
 import { mentionDraft } from "../messages/mention-draft";
+import { ThreadPanel } from "../messages/ThreadPanel";
 import { createRelaySession } from "../relay/session";
 import type { RelayData, RelaySnapshot } from "../relay/service";
 import type { Navigation } from "../navigation/controller";
@@ -419,6 +420,61 @@ it("opens a verified thread draft with the real reply composer and origin action
   expect(
     h.published.find((event) => event.content === "Thread draft")?.tags,
   ).toContainEqual(["e", h.root.id, "", "reply"]);
+});
+
+it("reopens a saved task draft, edits it, and sends in the task branch", async () => {
+  const h = fixture();
+  const task = h.seedSent(true, "room", "Start task");
+  const key = `draft:room:thread:${task.id}`;
+  const taskView = render(
+    <ThreadPanel
+      session={h.session}
+      scope={h.session.scope}
+      channelId="room"
+      channelName="#Design"
+      messageId={task.id}
+      subthreadId={task.id}
+      onOpenLink={() => false}
+    />,
+  );
+  const input = (await screen.findByRole("textbox")) as ComposerInputElement;
+  act(() => {
+    input.value = "Saved task draft";
+    fireEvent.input(input);
+  });
+  await waitFor(() =>
+    expect(mentionDraft(readView(h.session.scope, key, "")).text).toBe(
+      "Saved task draft",
+    ),
+  );
+  taskView.unmount();
+  h.render();
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: /Continue draft.*Saved task draft/,
+    }),
+  );
+  const region = screen.getByRole("region", { name: "Draft for #Design" });
+  const editor = (await within(region).findByRole(
+    "textbox",
+  )) as ComposerInputElement;
+  await waitFor(() => expect(editor).toHaveTextContent("Saved task draft"));
+  act(() => {
+    editor.value = "Edited task draft";
+    fireEvent.input(editor);
+  });
+  fireEvent.click(within(region).getByRole("button", { name: "Send message" }));
+  await waitFor(() =>
+    expect(
+      h.published.some((event) => event.content === "Edited task draft"),
+    ).toBe(true),
+  );
+  const sent = h.published.find(
+    (event) => event.content === "Edited task draft",
+  );
+  expect(sent?.tags).toContainEqual(["e", h.root.id, "", "root"]);
+  expect(sent?.tags).toContainEqual(["e", task.id, "", "reply"]);
+  expect(mentionDraft(readView(h.session.scope, key, "")).text).toBe("");
 });
 
 it.each([false, true])(
