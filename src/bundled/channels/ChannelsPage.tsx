@@ -34,6 +34,8 @@ import {
   useChannelTabState,
 } from "./useChannelTabState";
 import { ChannelMembersDialog } from "./ChannelMembersDialog";
+import { canAddMembers } from "../../features/channel-members/members";
+import type { MentionRecipient } from "../../features/messages/mention-draft";
 import { ChannelHeaderIdentity, memberAccess } from "./ChannelHeaderIdentity";
 import {
   matchesConversation,
@@ -957,9 +959,54 @@ function ChannelWorkspace({
     notify(`${muted ? "Unmuted" : "Muted"} ${channel.name}`, "success");
     return true;
   };
-  const handleCommand = (command: string, signal: AbortSignal) => {
+  // `/invite @name…` adds the mentioned people through the same session-owned
+  // additions as Members, which keep failed ones retryable.
+  const invite = async (
+    channel: ChannelSummary,
+    command: string,
+    mentions: readonly MentionRecipient[],
+  ) => {
+    const rest = mentions.reduce(
+      (text, person) => text.replace(`@${person.name}`, ""),
+      command.slice("/invite".length),
+    );
+    if (!mentions.length || /[^\s,]/.test(rest))
+      throw new Error("Mention who to invite, like /invite @name.");
+    if (!canAddMembers(queries, channel))
+      throw new Error("You can’t add people to this conversation.");
+    const people = [
+      ...new Map(mentions.map((person) => [person.pubkey, person])).values(),
+    ];
+    const added = people.filter(
+      (person) => !channel.members?.includes(person.pubkey),
+    );
+    const failed = (
+      await Promise.allSettled(
+        added.map((person) =>
+          queries.memberAdditions.add(channel.id, person.pubkey),
+        ),
+      )
+    ).find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+    const names = (list: typeof people) =>
+      list.map((person) => person.name).join(", ");
+    notify(
+      added.length
+        ? `Added ${names(added)} to ${channel.name}`
+        : `${names(people)} ${people.length > 1 ? "are" : "is"} already in ${channel.name}`,
+      "success",
+    );
+    return true;
+  };
+  const handleCommand = (
+    command: string,
+    signal: AbortSignal,
+    mentions: readonly MentionRecipient[],
+  ) => {
     if (!current || solo) return false;
     const name = command.toLowerCase();
+    if (/^\/invite(\s|$)/.test(name)) return invite(current, command, mentions);
+    if (mentions.length) return false;
     if (name === "/mute") return toggleMute(current);
     if (name !== "/leave") return false;
     return (async () => {

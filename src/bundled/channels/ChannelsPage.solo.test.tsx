@@ -368,6 +368,10 @@ function fixture({
       },
     },
     messages: { ...owner.session.messages, send },
+    memberAdditions: {
+      ...owner.session.memberAdditions,
+      add: vi.fn<RelaySession["memberAdditions"]["add"]>(async () => {}),
+    },
     sidebarPreferences: muted
       ? {
           ...owner.session.sidebarPreferences,
@@ -736,6 +740,49 @@ it("keeps /mute in the composer where mutes are unavailable", async () => {
   ).toBeInTheDocument();
   expect(f.send).not.toHaveBeenCalled();
   expect(editor).toHaveValue("/mute");
+});
+
+it.each([
+  {
+    who: "someone outside",
+    pubkey: "c".repeat(64),
+    toast: "Added Teammate to Planning",
+  },
+  { who: "a member", pubkey: agent, toast: "Teammate is already in Planning" },
+])("adds $who with /invite without posting it", async ({ pubkey, toast }) => {
+  const f = fixture({ type: "stream" });
+  const add = f.session.memberAdditions.add;
+  writeView(f.scope, `draft:${id}`, {
+    text: "/invite @Teammate",
+    recipients: [{ pubkey, name: "Teammate", start: 8, end: 17 }],
+  });
+  f.mountWithToasts();
+  const editor = await screen.findByRole("textbox", {
+    name: "Message Planning",
+  });
+  const user = userEvent.setup();
+  await user.click(editor);
+  await user.keyboard("{Enter}");
+  expect(await screen.findByText(toast)).toBeInTheDocument();
+  if (pubkey === agent) expect(add).not.toHaveBeenCalled();
+  else expect(add).toHaveBeenCalledExactlyOnceWith(id, pubkey);
+  expect(f.send).not.toHaveBeenCalled();
+  expect(editor).toHaveValue("");
+});
+
+it("keeps /invite in the composer until it mentions someone", async () => {
+  const f = fixture({ type: "stream" });
+  f.mountWithToasts();
+  const editor = await screen.findByRole("textbox", {
+    name: "Message Planning",
+  });
+  const user = userEvent.setup();
+  await user.type(editor, "/invite{Enter}");
+  expect(
+    await screen.findByText("Mention who to invite, like /invite @name."),
+  ).toBeInTheDocument();
+  expect(f.send).not.toHaveBeenCalled();
+  expect(editor).toHaveValue("/invite");
 });
 
 it("retires the Archive shortcut once the chat is archived", async () => {

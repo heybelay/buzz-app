@@ -645,6 +645,7 @@ it("consumes a handled slash command without publishing it", async () => {
   expect(onCommand).toHaveBeenCalledExactlyOnceWith(
     "/leave",
     expect.any(AbortSignal),
+    [],
   );
   expect(h.messages.send).not.toHaveBeenCalled();
 
@@ -652,6 +653,23 @@ it("consumes a handled slash command without publishing it", async () => {
   h.submit();
   await waitFor(() => expect(h.messages.send).toHaveBeenCalledOnce());
   expect(h.messages.send).toHaveBeenCalledWith("channel", "/shrug", [], []);
+});
+
+it("hands a slash command the people it mentions", async () => {
+  writeView("scope", "draft:channel", {
+    text: "/invite @Honey",
+    recipients: [{ ...first, start: 8, end: 14 }],
+  });
+  const onCommand = vi.fn(async () => true);
+  const h = mount({ onCommand });
+  h.submit();
+  await waitFor(() => expect(h.input()).toHaveValue(""));
+  expect(onCommand).toHaveBeenCalledExactlyOnceWith(
+    "/invite @Honey",
+    expect.any(AbortSignal),
+    [first],
+  );
+  expect(h.messages.send).not.toHaveBeenCalled();
 });
 
 it("keeps a slash command draft when its handler refuses", async () => {

@@ -334,10 +334,15 @@ export type MessageComposerProps = {
   /** Narrows a submission's agents to those its owner accepts. */
   agentFilter?: ((pubkey: string) => boolean) | undefined;
   onSend?: (id: string) => void;
-  /** A plain slash command with no recipients or attachments may be consumed by
-   * its conversation owner. Return false to send it as an ordinary message. */
+  /** A slash command with no attachments may be consumed by its conversation
+   * owner, which receives the people it mentions. Return false to send it as
+   * an ordinary message. */
   onCommand?:
-    | ((command: string, signal: AbortSignal) => boolean | Promise<boolean>)
+    | ((
+        command: string,
+        signal: AbortSignal,
+        mentions: readonly MentionRecipient[],
+      ) => boolean | Promise<boolean>)
     | undefined;
   /** Inbox may retire only after saving the replacement or confirming no draft remains. */
   onDraftSaved?: (() => void) | undefined;
@@ -2804,7 +2809,6 @@ function Composer({
       : { ...capturedPicks, ...(choicesNow?.value ?? {}) };
     const command =
       onCommand &&
-      !captured.recipients.length &&
       !captured.pending?.length &&
       !captured.chatCards?.length &&
       !captured.gifs?.length &&
@@ -2825,7 +2829,11 @@ function Composer({
       const tokens = draftTokens(captured);
       messageTokenTags(tokens);
       if (command && onCommand) {
-        const handled = onCommand(command, attempt.signal);
+        const handled = onCommand(
+          command,
+          attempt.signal,
+          captured.recipients.map(({ pubkey, name }) => ({ pubkey, name })),
+        );
         if (handled !== false) {
           setSending(true);
           if (await handled) {
