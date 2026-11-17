@@ -874,8 +874,8 @@ and are asked to sign in again in Buzz.
   readable. View only retains Guest admission. Copying its link alone does not grant access. Check the intended people
   and destination before changing access. If an older saved invitation granted
   view-only access, remove that person in People and invite them again for
-  participation. For an older unresolved invitation, use **Retry** in Outbox
-  or add the person again if the receipt is already Seen. After its 15-minute
+  participation. For an older unresolved invitation, add the person again.
+  After its 15-minute
   delivery window, Buzz verifies the original command and current membership
   before allowing a fresh participation invitation; failed checks keep the original.
   If the original invitation was applied and the person was later removed, Retry

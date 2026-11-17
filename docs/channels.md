@@ -1651,7 +1651,8 @@ lines themselves stay text in the composer and render as headings once sent. A s
 never strikes, and pasted or restored delimiters stay literal text that still renders once
 sent. Reply counts open a bounded thread view; attachments are
 links. Routine freshness labels are not shown; Channel Settings → Diagnostics
-exposes refresh, outbox inspection and timings. Packaged builds do not
+exposes refresh, outbox inspection and timings in developer and browser test
+builds only (`diagnosticsAvailable`). Packaged builds do not
 include the development relay broker. GitHub fetches public data only; signed-in
 GitHub actions remain on GitHub. A saved-groups/stars failure keeps its specific
 reason under **Channel Settings → Diagnostics → Saved groups and stars**.
