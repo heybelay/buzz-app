@@ -301,6 +301,7 @@ function fixture(upload?: () => Promise<UploadedAttachment>) {
       channelId = "room",
       text = "Already sent",
       createdAt = 25,
+      parentId = root.id,
     ) => {
       const sent = message(
         viewer,
@@ -310,7 +311,7 @@ function fixture(upload?: () => Promise<UploadedAttachment>) {
         thread
           ? [
               ["e", root.id, "", "root"],
-              ["e", root.id, "", "reply"],
+              ["e", parentId, "", "reply"],
             ]
           : [],
       );
@@ -392,6 +393,7 @@ it("edits and sends from the real channel composer, then focuses a surviving row
 
 it("opens a verified thread draft with the real reply composer and origin action", async () => {
   const h = fixture();
+  h.seedSent(true, "room", "Reply with an unloaded parent", 25, "f".repeat(64));
   const key = `draft:room:thread:${h.root.id}`;
   writeView(h.session.scope, key, "Thread draft");
   h.render();
@@ -401,6 +403,9 @@ it("opens a verified thread draft with the real reply composer and origin action
   const region = screen.getByRole("region", { name: "Draft for #Design" });
   const editor = await within(region).findByRole("textbox");
   await waitFor(() => expect(editor).toHaveTextContent("Thread draft"));
+  expect(
+    await within(region).findByText("Reply with an unloaded parent"),
+  ).toBeInTheDocument();
   fireEvent.click(
     within(region).getByRole("button", { name: "Open conversation" }),
   );

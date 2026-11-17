@@ -383,9 +383,10 @@ export function createThreadView({
           : row;
       }),
     );
-    const rows = subthread
-      ? subthreadMessages(sourceRows, messageId)
-      : sourceRows;
+    const rows =
+      subthread && messageId !== rootId
+        ? subthreadMessages(sourceRows, messageId)
+        : sourceRows;
     const displayedRoot = subthread ? messageId : rootId;
     const target =
       targetStatus === "ready"
