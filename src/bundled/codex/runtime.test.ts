@@ -1,4 +1,5 @@
 import { openVoice } from "./voice";
+import { matchFilters } from "nostr-tools/filter";
 import {
   createToolOperation,
   type AgentToolAuthority,
@@ -7957,6 +7958,34 @@ describe("a conversation given its own folder", () => {
     f.complete(0, "DONE");
     await vi.waitFor(() => expect(f.publish).toHaveBeenCalledTimes(1));
   });
+});
+
+it("includes source-root requirements in a new invocation task", async () => {
+  const f = fixture();
+  const d = f.delivery("Implement the above");
+  if (d.trigger.type !== "mention") throw new Error("Expected mention");
+  const source = {
+    ...d.trigger.event,
+    id: root,
+    content: "SOURCE_REQUIREMENT",
+    created_at: d.trigger.event.created_at - 1,
+    tags: [["h", "channel"]],
+  };
+  f.read.mockImplementation(async (...args: unknown[]) =>
+    [source].filter((event) =>
+      matchFilters(args[0] as Parameters<typeof matchFilters>[0], event),
+    ),
+  );
+  await f.runtime.run({
+    ...d,
+    routeConversation: async () => ({
+      root,
+      parent: d.trigger.type === "mention" ? d.trigger.event.id : "",
+    }),
+  });
+  await vi.waitFor(() => expect(f.starts()).toHaveLength(1));
+  expect(JSON.stringify(f.starts()[0]?.params)).toContain("SOURCE_REQUIREMENT");
+  await f.complete();
 });
 
 it.each(["thread", "channel"])(

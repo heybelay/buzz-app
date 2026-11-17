@@ -311,7 +311,7 @@ export function harnessKit(sources: Sources): HarnessKit {
       const { key, channel: channelId, topLevel } = conversation;
       const ready = session(agent.key);
       const thread = threadReference(event);
-      const rootId = thread?.rootId ?? event.id;
+      const rootId = conversation.sourceRoot ?? thread?.rootId ?? event.id;
       const shown = parseCursor(options.cursor);
       // Sharing a session does not mean it has seen every thread in the
       // channel, so a channel conversation keeps a mark for each thread.

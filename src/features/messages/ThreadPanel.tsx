@@ -2311,7 +2311,8 @@ function ThreadMessages({
           channelId={channelId}
           channelName={channelName}
           placeholder={replyPlaceholder(composerRoot)}
-          threadRootId={composerRoot.threadRootId ?? composerRoot.id}
+          threadRootId={composerRoot.id}
+          sourceRootId={composerRoot.threadRootId}
           threadSeed={threadSeed}
           replyParentId={
             replyParent ??

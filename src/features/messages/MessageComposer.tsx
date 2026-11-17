@@ -350,6 +350,8 @@ export type MessageComposerProps = {
     | undefined;
   canOpenLink?: ((target: string) => boolean) | undefined;
   threadRootId?: string;
+  /** Physical source thread when threadRootId is a task anchor. */
+  sourceRootId?: string | undefined;
   /** The viewer's latest message in this thread, once the thread has loaded.
    * An empty thread composer starts with the agents it notified (see
    * seedMentions); other composers read their own channel window. */
@@ -536,6 +538,7 @@ function Composer({
   onOpenLink,
   canOpenLink,
   threadRootId,
+  sourceRootId,
   threadSeed,
   replyParentId,
   mediaTargetUrl,
@@ -3070,7 +3073,7 @@ function Composer({
         return threadRootId
           ? sender.messages.reply(
               channelId,
-              threadRootId,
+              sourceRootId ?? threadRootId,
               content,
               recipients,
               uploaded,

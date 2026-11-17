@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { matchFilters } from "nostr-tools/filter";
 import { RESUMED_PROMPT } from "../../buzz-mcp/prompt";
 import { fromOwner } from "../agents/owner-attestation";
 import type { AgentHandle, Delivery } from "../agents/service";
@@ -377,6 +378,48 @@ describe("harnessKit.turnPrompt", () => {
       }),
     ).rejects.toThrow("not admitted");
   });
+});
+
+it("restores direct and nested task corrections for a rooted harness wake", async () => {
+  const root = message("1", "Source requirements");
+  const child = (id: string, parent: string, content: string) =>
+    message(id, content, {
+      tags: [
+        ["h", channel],
+        ["e", root.id, "", "root"],
+        ["e", parent, "", "reply"],
+      ],
+    });
+  const anchor = child("2", root.id, "Start task");
+  const direct = child("3", anchor.id, "DIRECT_CORRECTION");
+  const nested = child("4", direct.id, "NESTED_CORRECTION");
+  const unrelated = child("5", root.id, "UNRELATED_DISCUSSION");
+  const { kit, delivery, read } = setup();
+  read.mockImplementation(async (filters) =>
+    [root, anchor, direct, nested, unrelated].filter((event) =>
+      matchFilters(filters as Parameters<typeof matchFilters>[0], event),
+    ),
+  );
+  const d = delivery(
+    {
+      type: "plugin",
+      plugin: "test",
+      id: "9".repeat(64),
+      channel,
+      root: anchor.id,
+      text: "Resume task",
+      at: 200_000,
+    },
+    {
+      routeConversation: async () => ({ root: root.id, parent: anchor.id }),
+    },
+  );
+  const conversation = await kit.conversation(d, "thread");
+  if (!conversation) throw new Error("Not admitted");
+  const prompt = await kit.turnPrompt(d, conversation);
+  expect(prompt.text).toContain("DIRECT_CORRECTION");
+  expect(prompt.text).toContain("NESTED_CORRECTION");
+  expect(prompt.text).not.toContain("UNRELATED_DISCUSSION");
 });
 
 describe("harnessKit.systemPrompt", () => {

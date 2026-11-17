@@ -1465,7 +1465,7 @@ export class ClaudeRuntime {
     entry.memory = memory;
     const dm = summary?.dm === true;
     const thread = threadReference(event);
-    const rootId = thread?.rootId ?? event.id;
+    const rootId = route?.root ?? thread?.rootId ?? event.id;
     // The conversation it was admitted to, not the scope as it is now.
     const scope: Scope = key === channelId ? "channel" : "thread";
     // Sharing a session does not mean it has seen every thread in the channel.

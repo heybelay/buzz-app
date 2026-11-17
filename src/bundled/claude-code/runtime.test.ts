@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { matchFilters } from "nostr-tools/filter";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -2038,6 +2039,42 @@ it("takes a plugin's wake in its thread's session, as the plugin's and not a mes
   expect(prompt).toContain(`Thread root: ${root.id}`);
   expect(prompt).not.toContain("<buzz-event");
   expect(prompt).not.toContain(WAKE_ID);
+});
+
+it("restores direct and nested task corrections for a rooted wake", async () => {
+  const root = message("1", "Source requirements");
+  const child = (id: string, parent: string, content: string) =>
+    message(id, content, {
+      tags: [
+        ["h", channel],
+        ["e", root.id, "", "root"],
+        ["e", parent, "", "reply"],
+      ],
+    });
+  const anchor = child("2", root.id, "Start task");
+  const direct = child("3", anchor.id, "DIRECT_CORRECTION");
+  const nested = child("4", direct.id, "NESTED_CORRECTION");
+  const unrelated = child("5", root.id, "UNRELATED_DISCUSSION");
+  const { deliver, read, claudes } = setup();
+  read.mockImplementation(async (filters) =>
+    [root, anchor, direct, nested, unrelated].filter((event) =>
+      matchFilters(
+        filters as unknown as Parameters<typeof matchFilters>[0],
+        event,
+      ),
+    ),
+  );
+  await deliver(pluginWake(anchor.id), {
+    routeConversation: async () => ({ root: root.id, parent: anchor.id }),
+  });
+  await vi.waitFor(() =>
+    expect(claudes().some((process) => process.prompts.length)).toBe(true),
+  );
+  const prompt = claudes().find((process) => process.prompts.length)
+    ?.prompts[0];
+  expect(prompt).toContain("DIRECT_CORRECTION");
+  expect(prompt).toContain("NESTED_CORRECTION");
+  expect(prompt).not.toContain("UNRELATED_DISCUSSION");
 });
 
 it("reports a failed wake at its thread's root, never at the wake's own id", async () => {

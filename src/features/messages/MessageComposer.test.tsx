@@ -72,6 +72,7 @@ import { ConversationPresentation } from "../conversation/ConversationPresentati
 import { AgentsContext } from "../agents/react";
 import type { Agents, Models } from "../agents/service";
 import { MessageComposer, type MessageComposerProps } from "./MessageComposer";
+import { ThreadPanel } from "./ThreadPanel";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { InlineChip } from "../../shared/design-system/ui/InlineChip";
 import { MessageEditScope, useMessageEditScope } from "./MessageEditScope";
@@ -213,6 +214,7 @@ function mount(
   control?: LocalAgents,
   viewer?: string,
   agents?: Agents,
+  task?: ChannelMessage,
 ) {
   let commands: ComposerToolProps;
   const completionRequests: ComposerCompletionProps["publish"][] = [];
@@ -465,7 +467,44 @@ function mount(
     <AgentsContext.Provider value={agents}>
       <ConversationPresentation value={presented}>
         <div hidden={!presented} inert={!presented}>
-          <MessageComposer {...props} />
+          {task ? (
+            <ThreadPanel
+              session={{
+                ...props.session,
+                unread: {
+                  subscribe: () => () => {},
+                  snapshot: () => undefined,
+                  attention: () => ({ unread: false }),
+                } as unknown as RelaySession["unread"],
+                thread: () => {
+                  const snapshot = {
+                    status: "ready" as const,
+                    root: { ...task, id: props.threadRootId ?? task.id },
+                    replies: [],
+                    canLoadMore: false,
+                    limited: false,
+                  };
+                  return {
+                    snapshot: () => snapshot,
+                    subscribe: () => () => {},
+                    refresh: async () => {},
+                    loadMore: async () => {},
+                    dispose: () => {},
+                  } as unknown as ReturnType<RelaySession["thread"]>;
+                },
+              }}
+              scope={props.scope}
+              channelId={props.channelId}
+              channelName={props.channelName}
+              messageId={props.threadRootId ?? task.id}
+              subthreadId={props.threadRootId ?? task.id}
+              extensions={props.extensions}
+              onOpenLink={() => false}
+              active
+            />
+          ) : (
+            <MessageComposer {...props} />
+          )}
         </div>
       </ConversationPresentation>
     </AgentsContext.Provider>
@@ -4123,6 +4162,55 @@ const sessionAgents = (
     setSessionState(next: typeof state, source?: "harness" | "agents"): void;
   };
 };
+
+it("keeps task drafts and session controls separate while replying in their source thread", async () => {
+  const agents = sessionAgents("channel");
+  const source = "e".repeat(64);
+  const task = editableMessage({
+    id: "c".repeat(64),
+    threadRootId: source,
+    mentions: [],
+  });
+  const h = mount(
+    { threadRootId: task.id },
+    undefined,
+    second.pubkey,
+    agents,
+    task,
+  );
+  await screen.findByRole("textbox");
+  h.fill("Task A draft");
+  h.retarget({ threadRootId: "d".repeat(64) });
+  await waitFor(() => expect(h.input()).toHaveValue(""));
+  h.fill("Task B draft");
+  h.retarget({ threadRootId: task.id });
+  await waitFor(() => expect(h.input()).toHaveValue("Task A draft"));
+  act(() => h.commands().insertMention(first));
+  await h.user.click(
+    await screen.findByRole("button", { name: /Model.*effort/ }),
+  );
+  await h.user.click(
+    await screen.findByRole("button", { name: "Compact session" }),
+  );
+  expect(agents.session).toHaveBeenCalledWith(
+    first.pubkey,
+    { channelId: "channel", root: task.id },
+    "compact",
+  );
+  await h.user.click(
+    screen.getByRole("button", { name: "Start a new session" }),
+  );
+  expect(agents.session).toHaveBeenCalledWith(
+    first.pubkey,
+    { channelId: "channel", root: task.id },
+    "new",
+  );
+  await h.user.keyboard("{Escape}");
+  h.submit();
+  await waitFor(() => expect(h.messages.reply).toHaveBeenCalledOnce());
+  expect(h.messages.reply.mock.calls[0]?.[1]).toBe(source);
+  expect(h.messages.reply.mock.calls[0]?.[5]).toBe(task.id);
+});
 
 it("restores an attachment draft instead of publishing when compaction starts during upload", async () => {
   const agents = sessionAgents("channel");

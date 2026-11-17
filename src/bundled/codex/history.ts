@@ -30,7 +30,16 @@ export async function conversationHistory(
   const found = await read(
     root
       ? [
-          { ...filter, ids: [root], limit: 1 },
+          {
+            ...filter,
+            ids: [
+              ...new Set([
+                root,
+                ...(conversation.sourceRoot ? [conversation.sourceRoot] : []),
+              ]),
+            ],
+            limit: conversation.sourceRoot ? 2 : 1,
+          },
           { ...filter, "#e": [conversation.sourceRoot ?? root], limit: 50 },
         ]
       : [{ ...filter, limit: 50 }],
