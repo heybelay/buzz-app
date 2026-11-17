@@ -58,6 +58,7 @@ const catalog = (
       catalog: { profile: "", location: "", plugins },
       externalPluginsPaused: false,
     },
+    hostOwned: [info("buzz.emoji", "Emoji").manifest],
     activation: {},
     busy: false,
     error: null,
