@@ -730,6 +730,26 @@ it.each([
   },
 );
 
+it("offers Retry when a mute from /mute cannot be saved", async () => {
+  const f = fixture({ type: "stream", muted: [] });
+  vi.mocked(f.session.sidebarPreferences.setMute).mockRejectedValueOnce(
+    new Error("refused"),
+  );
+  f.mountWithToasts();
+  const editor = await screen.findByRole("textbox", {
+    name: "Message Planning",
+  });
+  const user = userEvent.setup();
+  await user.type(editor, "/mute{Enter}");
+  const failure = await screen.findByRole("dialog", {
+    name: "Couldn’t mute Planning",
+  });
+  expect(
+    within(failure).getByRole("button", { name: "Retry" }),
+  ).toBeInTheDocument();
+  expect(f.send).not.toHaveBeenCalled();
+});
+
 it("keeps /mute in the composer where mutes are unavailable", async () => {
   const f = fixture({ type: "stream" });
   f.mountWithToasts();

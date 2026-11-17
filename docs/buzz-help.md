@@ -667,8 +667,10 @@ and are asked to sign in again in Buzz.
   their avatar previews. The macOS Dock unread dot follows the rows: a muted channel
   lights it only for a mention of you or **Mark as unread**, and a muted DM still lights it.
   Muting does not mark messages or threads as read.
-  In a channel or DM, typing `/mute` by itself toggles Mute for it, and a toast
-  confirms the change. The command is not posted as a message.
+  In a channel's or DM's main message box, typing `/mute` by itself toggles
+  Mute for it, and a toast shows the change. The command is not posted as a
+  message. If the change cannot be saved, a notice offers **Retry**. Thread
+  replies send `/mute` as text.
 - **Adding to a DM**: open the DM's access dialog and search for someone to
   add. An agent joins right away and can read the DM's earlier messages. For a
   person, choose **Include history** to add them to this DM with its earlier
@@ -768,11 +770,13 @@ and are asked to sign in again in Buzz.
   Use **Leave chat** or **Leave channel** to remove your membership and sidebar
   entry. Joined viewers keep reading after a switch to Private until they leave
   or are removed in People.
-- In a channel, typing `/leave` by itself opens the same **Leave channel**
-  confirmation. The command is not posted as a message.
-- In a channel, typing `/invite` followed by one or more @mentions adds those
-  people or agents, as **Members** does, and a toast confirms it. The command is not
-  posted as a message. People already in the channel are skipped.
+- In a channel's main message box, typing `/leave` by itself opens the same
+  **Leave channel** confirmation. The command is not posted as a message.
+  Thread replies send `/leave` as text.
+- In a channel's main message box, typing `/invite` followed by one or more
+  @mentions adds those people or agents, as **Members** does, and a toast shows
+  who was added. The command is not posted as a message. People already in the
+  channel are skipped. Thread replies send `/invite` as text.
 - Deleting the open Solo chat opens a neighboring Solo chat or a new draft while
   deletion finishes. The chat stays listed until deletion is confirmed. If it
   fails, a notice names the chat; you can reopen it from the sidebar.
