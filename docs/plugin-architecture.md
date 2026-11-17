@@ -2065,7 +2065,10 @@ composers sign; trust a chip only as far as you trust the message's author.
 Bundled host grants use the effective compiled manifest at revision `bundled` and
 require the plugin to be enabled in the native catalog. External grants require the
 enabled current artifact and its integrity checks; safe mode pauses external
-plugins while enabled bundled plugins remain usable.
+plugins while enabled bundled plugins remain usable. A built-in conversation
+feature (Emoji, Mentions, Plugin requests) has no catalog entry and is always on:
+at revision `bundled` it has the host access its own manifest declares, and none
+declares any.
 
 Builderlab's effective manifest has only a `host.federatedIdentity` grant of
 exact Builderlab routes for the build's
