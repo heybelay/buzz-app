@@ -335,27 +335,33 @@ it("delivers a late webhook secret on the landing page after confirmed navigatio
   );
 });
 
-it("labels landing controls as configuration and retains the runtime caveat in detail", async () => {
+it("labels the landing switch Enabled and keeps the in-progress caveat beside the detail and editor switches", async () => {
   mount();
   expect(
     await screen.findByRole("switch", {
-      name: "Enabled in configuration: Message helper",
+      name: "Enabled: Message helper",
     }),
   ).not.toBeChecked();
   expect(screen.queryByText("Configuration: Off")).not.toBeInTheDocument();
+  // The list has no page footnote; the caveat sits beside each switch row.
   expect(
-    screen.getByText(/Turning off does not confirm runs have stopped/),
-  ).toBeVisible();
+    screen.queryByText(/Runs already in progress are not cancelled/),
+  ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: /^Open Message helper:/ }),
   );
+  expect(
+    detailPane().getByText(
+      "Turning off only affects future runs. Runs already in progress are not cancelled.",
+    ),
+  ).toBeVisible();
   fireEvent.click(detailPane().getByRole("button", { name: "Edit workflow" }));
   expect(
     await screen.findByRole("region", { name: "Workflow editor" }),
   ).toBeVisible();
   expect(
     within(screen.getByRole("dialog", { name: "Message helper" })).getByText(
-      /Turning off does not confirm runs have stopped/,
+      "Applies when you save. Runs already in progress are not cancelled.",
     ),
   ).toBeVisible();
 });
@@ -368,7 +374,7 @@ it("explains another author's disabled controls from the landing through the rea
     screen.getByRole("radio", { name: "All channel workflows" }),
   );
   const toggle = await screen.findByRole("switch", {
-    name: "Enabled in configuration: Message helper",
+    name: "Enabled: Message helper",
   });
   expect(toggle).toHaveAttribute("aria-disabled", "true");
   expect(toggle).toHaveAccessibleDescription(
@@ -383,7 +389,7 @@ it("explains another author's disabled controls from the landing through the rea
   );
   const pane = detailPane();
   const paneToggle = pane.getByRole("switch", {
-    name: "Enabled in configuration",
+    name: "Enabled",
   });
   expect(paneToggle).toHaveAttribute("aria-disabled", "true");
   expect(paneToggle).toHaveAccessibleDescription(
@@ -396,7 +402,7 @@ it("explains another author's disabled controls from the landing through the rea
   const dialog = screen.getByRole("dialog", { name: "Message helper" });
   const controls = within(dialog);
   const enable = controls.getByRole("switch", {
-    name: "Enabled in configuration",
+    name: "Enabled",
   });
   expect(enable).toHaveAttribute("aria-disabled", "true");
   expect(enable).toHaveAccessibleDescription(
@@ -430,7 +436,7 @@ it("explains a pending toggle until exact readback and then shows the saved stat
   const user = userEvent.setup();
   const fixture = mount();
   const toggle = await screen.findByRole("switch", {
-    name: "Enabled in configuration: Message helper",
+    name: "Enabled: Message helper",
   });
   await user.click(toggle);
   await user.click(screen.getByRole("button", { name: "Turn on" }));
@@ -442,7 +448,7 @@ it("explains a pending toggle until exact readback and then shows the saved stat
   expect(toggle).not.toBeChecked();
   await act(async () => fixture.finish("succeeded"));
   const savedToggle = screen.getByRole("switch", {
-    name: "Enabled in configuration: Message helper",
+    name: "Enabled: Message helper",
   });
   expect(savedToggle).not.toHaveAttribute("aria-disabled", "true");
   expect(savedToggle).toBeChecked();
@@ -475,7 +481,7 @@ it("shows valid omitted-enabled configuration as on", async () => {
   mount(fixtureYaml.replace("enabled: false\n", ""));
   expect(
     await screen.findByRole("switch", {
-      name: "Enabled in configuration: Message helper",
+      name: "Enabled: Message helper",
     }),
   ).toBeChecked();
 });
@@ -908,7 +914,7 @@ it("recovers on the grid when detail deletion is refused by an unresolved save",
   const user = userEvent.setup();
   await user.click(
     await screen.findByRole("switch", {
-      name: "Enabled in configuration: Message helper",
+      name: "Enabled: Message helper",
     }),
   );
   await user.click(screen.getByRole("button", { name: "Turn on" }));
@@ -984,7 +990,7 @@ it("returns to the grid before completion, then shows rejection and restores act
   ).toBeEnabled();
   expect(
     screen.getByRole("switch", {
-      name: "Enabled in configuration: Message helper",
+      name: "Enabled: Message helper",
     }),
   ).toBeEnabled();
   await confirmDeletion();

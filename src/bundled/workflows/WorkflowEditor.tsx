@@ -169,17 +169,17 @@ export function WorkflowEditor({
         : chooseChannel
           ? "Choose a channel before editing."
           : !fields.editable
-            ? "Correct the YAML before changing the name or configuration."
+            ? "Correct the YAML before changing the name or turning this workflow on or off."
             : undefined));
   const enableReason = fields.enabled === false ? enableBlocked : undefined;
   const enableSwitch = fields.editable ? (
     <SwitchPreferenceRow
-      label="Enabled in configuration"
+      label="Enabled"
       description={
         enableReason ??
         // In YAML view the status line directly below already shows the reason.
         (mode === "form" || readOnly ? controlReason : undefined) ??
-        "Configuration changes apply on save. Turning off does not confirm runs have stopped or cancel active runs."
+        "Applies when you save. Runs already in progress are not cancelled."
       }
       checked={fields.enabled !== false}
       disabled={disabled || !!enableReason}

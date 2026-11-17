@@ -1170,13 +1170,13 @@ it("renders the selected card's detail into the target and toggles the selection
     ).toBeEnabled();
     expect(open).toHaveAttribute("aria-pressed", "true");
     expect(
-      within(detail).getByRole("switch", { name: "Enabled in configuration" }),
+      within(detail).getByRole("switch", { name: "Enabled" }),
     ).toHaveAccessibleDescription(
-      "Saved configuration only. Turning off does not confirm runs have stopped or cancel active runs.",
+      "Turning off only affects future runs. Runs already in progress are not cancelled.",
     );
     fireEvent.click(within(detail).getByRole("button", { name: "Run now" }));
     expect(
-      within(detail).getByRole("switch", { name: "Enabled in configuration" }),
+      within(detail).getByRole("switch", { name: "Enabled" }),
     ).toHaveAccessibleDescription(
       "Waiting for the submitted change to be resolved.",
     );
@@ -1330,11 +1330,11 @@ it("keeps the detail mounted and focused across a revision readback", async () =
       name: "Message helper",
     });
     const toggle = within(detail).getByRole("switch", {
-      name: "Enabled in configuration",
+      name: "Enabled",
     });
     expect(toggle).not.toBeChecked();
     expect(
-      within(detail).getByText(/Turning off does not confirm runs/),
+      within(detail).getByText(/Runs already in progress are not cancelled/),
     ).toBeVisible();
     toggle.focus();
     const user = userEvent.setup();
@@ -2041,7 +2041,7 @@ it.each(["delete", "enable"] as const)(
       } else {
         fireEvent.click(
           screen.getByRole("switch", {
-            name: "Enabled in configuration: Message helper",
+            name: "Enabled: Message helper",
           }),
         );
       }
@@ -2099,7 +2099,7 @@ it("marks an archived channel's workflows as not runnable and blocks only turnin
   const run = (name: string) =>
     screen.getByRole("button", { name: `Run now: ${name}` });
   const toggle = (name: string) =>
-    screen.getByRole("switch", { name: `Enabled in configuration: ${name}` });
+    screen.getByRole("switch", { name: `Enabled: ${name}` });
   try {
     const group = await screen.findByRole("region", { name: "General" });
     await waitFor(() =>
@@ -2148,7 +2148,7 @@ it("marks an archived channel's workflows as not runnable and blocks only turnin
     expect(detailRun).toHaveAttribute("aria-disabled", "true");
     expect(detailRun).toHaveAccessibleDescription(reason);
     const detailToggle = within(detail).getByRole("switch", {
-      name: "Enabled in configuration",
+      name: "Enabled",
     });
     expect(detailToggle).toHaveAttribute("aria-disabled", "true");
     expect(detailToggle).toHaveAccessibleDescription(reason);
@@ -2196,7 +2196,7 @@ it.each(["card", "detail"] as const)(
       if (surface === "card") {
         await user.click(
           await screen.findByRole("switch", {
-            name: "Enabled in configuration: Message helper",
+            name: "Enabled: Message helper",
           }),
         );
       } else {
@@ -2206,7 +2206,7 @@ it.each(["card", "detail"] as const)(
         await user.click(
           within(
             within(target).getByRole("region", { name: "Message helper" }),
-          ).getByRole("switch", { name: "Enabled in configuration" }),
+          ).getByRole("switch", { name: "Enabled" }),
         );
       }
       const confirm = await screen.findByRole("alertdialog", {
