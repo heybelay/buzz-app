@@ -526,6 +526,8 @@ function WorkflowCard({
   } | null>(null);
   // History reads only the workflow's identity, which the card key fixes.
   const [history] = useState(definition);
+  // Whether the run history on screen in the detail lists an unfinished run.
+  const [runInProgress, setRunInProgress] = useState(false);
   const openRef = useRef<HTMLButtonElement>(null);
   const wasSelected = useRef(selected);
   useEffect(() => {
@@ -573,6 +575,11 @@ function WorkflowCard({
           : !capability.availability.save
             ? "Saving is unavailable from this host."
             : undefined;
+  const toggleDescription =
+    toggleReason ??
+    (runInProgress
+      ? "Turning off only affects future runs. Runs already in progress are not cancelled."
+      : undefined);
   const reasonId = useId();
   const archivedReasonId = useId();
   const deleteReasonId = useId();
@@ -860,10 +867,7 @@ function WorkflowCard({
         <SettingsGroup>
           <SwitchPreferenceRow
             label="Enabled"
-            description={
-              toggleReason ??
-              "Turning off only affects future runs. Runs already in progress are not cancelled."
-            }
+            {...(toggleDescription ? { description: toggleDescription } : {})}
             checked={enabled}
             disabled={!!toggleReason}
             onCheckedChange={(next) => {
@@ -878,6 +882,7 @@ function WorkflowCard({
         key={createdRun ?? ""}
         capability={capability}
         workflow={history}
+        onInProgressChange={setRunInProgress}
       />
     </section>
   );

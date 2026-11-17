@@ -27,6 +27,7 @@ import {
   createWorkflowFixture,
   fixtureChannel,
   fixtureDefinition,
+  fixtureRun,
   fixtureViewer,
   fixtureYaml,
 } from "./fixtures";
@@ -335,35 +336,44 @@ it("delivers a late webhook secret on the landing page after confirmed navigatio
   );
 });
 
-it("labels the landing switch Enabled and keeps the in-progress caveat beside the detail and editor switches", async () => {
-  mount();
+it("labels the landing switch Enabled and shows the in-progress caveat in the detail only while a run is unfinished", async () => {
+  const caveat =
+    "Turning off only affects future runs. Runs already in progress are not cancelled.";
+  const fixture = mount();
   expect(
     await screen.findByRole("switch", {
       name: "Enabled: Message helper",
     }),
   ).not.toBeChecked();
   expect(screen.queryByText("Configuration: Off")).not.toBeInTheDocument();
-  // The list has no page footnote; the caveat sits beside each switch row.
-  expect(
-    screen.queryByText(/Runs already in progress are not cancelled/),
-  ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: /^Open Message helper:/ }),
   );
-  expect(
-    detailPane().getByText(
-      "Turning off only affects future runs. Runs already in progress are not cancelled.",
-    ),
-  ).toBeVisible();
+  const paneToggle = detailPane().getByRole("switch", { name: "Enabled" });
+  // The detail's only run has completed.
+  await detailPane().findByText("completed");
+  expect(paneToggle).not.toHaveAccessibleDescription();
+  act(() =>
+    fixture.runViews.at(-1)?.update({
+      status: "ready",
+      data: { runs: [{ ...fixtureRun, status: "running" }], next: null },
+    }),
+  );
+  expect(paneToggle).toHaveAccessibleDescription(caveat);
+  expect(detailPane().getByText(caveat)).toBeVisible();
+  // The list rows carry no caveat: it sits beside the detail's switch.
+  expect(screen.getAllByText(/Runs already in progress/)).toHaveLength(1);
   fireEvent.click(detailPane().getByRole("button", { name: "Edit workflow" }));
   expect(
     await screen.findByRole("region", { name: "Workflow editor" }),
   ).toBeVisible();
+  // The editor reads run history only in its Runs tab, which replaces the
+  // switch, so it has nothing to base the caveat on.
+  const dialog = within(screen.getByRole("dialog", { name: "Message helper" }));
   expect(
-    within(screen.getByRole("dialog", { name: "Message helper" })).getByText(
-      "Applies when you save. Runs already in progress are not cancelled.",
-    ),
-  ).toBeVisible();
+    dialog.getByRole("switch", { name: "Enabled" }),
+  ).not.toHaveAccessibleDescription();
+  expect(dialog.queryByText(/Runs already in progress/)).toBeNull();
 });
 
 it("explains another author's disabled controls from the landing through the read-only dialog", async () => {

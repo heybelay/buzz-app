@@ -114,9 +114,8 @@ test.each([false, true])(
     const toggle = screen.getByRole("switch", {
       name: "Enabled",
     });
-    expect(toggle).toHaveAccessibleDescription(
-      "Applies when you save. Runs already in progress are not cancelled.",
-    );
+    // Nothing stops this switch, and the editor holds no run history here.
+    expect(toggle).not.toHaveAccessibleDescription();
     await user.click(toggle);
     expect(toggle).toBeChecked();
     expect(

@@ -172,15 +172,16 @@ export function WorkflowEditor({
             ? "Correct the YAML before changing the name or turning this workflow on or off."
             : undefined));
   const enableReason = fields.enabled === false ? enableBlocked : undefined;
+  // Run history is read only in the Runs tab, which replaces this row, so the
+  // editor cannot say here whether a run is in progress.
+  const enableDescription =
+    enableReason ??
+    // In YAML view the status line directly below already shows the reason.
+    (mode === "form" || readOnly ? controlReason : undefined);
   const enableSwitch = fields.editable ? (
     <SwitchPreferenceRow
       label="Enabled"
-      description={
-        enableReason ??
-        // In YAML view the status line directly below already shows the reason.
-        (mode === "form" || readOnly ? controlReason : undefined) ??
-        "Applies when you save. Runs already in progress are not cancelled."
-      }
+      {...(enableDescription ? { description: enableDescription } : {})}
       checked={fields.enabled !== false}
       disabled={disabled || !!enableReason}
       onCheckedChange={(enabled) =>

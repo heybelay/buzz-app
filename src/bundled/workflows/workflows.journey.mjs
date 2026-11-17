@@ -1791,12 +1791,11 @@ test("late webhook receipt survives navigation and exact readback on the landing
   const editor = editorControls(page);
   const { button, yaml } = editor;
   await editor.open("Fixture A helper");
-  // In the editor the caveat describes the inspector's enable switch.
+  // The editor reads run history only in its Runs tab, so the inspector's
+  // enable switch carries no in-progress caveat.
   await expect(
-    editor.region.getByText(
-      "Applies when you save. Runs already in progress are not cancelled.",
-    ),
-  ).toBeVisible();
+    editor.region.getByRole("switch", { name: "Enabled", exact: true }),
+  ).toHaveAccessibleDescription("");
   await editor.tab("YAML").click();
   await yaml.fill(
     (await yaml.inputValue()).replace("on: message_posted", "on: webhook"),
