@@ -21,8 +21,8 @@ afterEach(async () => {
   for (const close of cleanup.splice(0)) await close();
   vi.restoreAllMocks();
 });
-function fixture() {
-  const h = createSoloRegionFixture();
+function fixture(...args: Parameters<typeof createSoloRegionFixture>) {
+  const h = createSoloRegionFixture(...args);
   cleanup.push(h.dispose);
   return h;
 }
@@ -677,6 +677,95 @@ it.each(["starting", "failed", "paused", "stale"] as const)(
     expect(h.service.snapshot().regions[0]?.reason).toBe(
       state === "starting" ? "loading" : state === "failed" ? "failed" : "off",
     );
+  },
+);
+
+const emoji = { id: "buzz.emoji", name: "Emoji", apiVersion: 1 } as const;
+const emojiLabel = "buzz.region:buzz.emoji:work";
+const labeledChat = (viewer: string, id: string, region: string) => ({
+  id,
+  name: id,
+  channelType: "solo" as const,
+  creator: viewer,
+  labels: ["buzz.solo", region],
+});
+
+it("reads a starting host-owned feature's region as loading, like a catalog plugin's", () => {
+  const h = fixture(undefined, [emoji]);
+  // An owner id that only begins with a host-owned id is not that feature.
+  const lookalike = "buzz.region:buzz.emoji.more:work";
+  h.roster([
+    ...h.session.channels.list().channels,
+    labeledChat(h.session.viewer, "feature", emojiLabel),
+    labeledChat(h.session.viewer, "lookalike", lookalike),
+  ]);
+  h.plugins(pluginConfiguration(true), {
+    example: { revision: "one", status: "starting", error: null },
+    "buzz.emoji": { revision: "bundled", status: "starting", error: null },
+  });
+
+  const region = (value: string) =>
+    h.service.snapshot().regions.find((item) => item.label === value);
+  expect(region(emojiLabel)).toMatchObject({
+    reason: "loading",
+    hostOwned: true,
+  });
+  expect(region(label)).toMatchObject({ reason: "loading" });
+  expect(region(label)).not.toHaveProperty("hostOwned");
+  expect(region(lookalike)).toMatchObject({ reason: "not-installed" });
+  expect(region(lookalike)).not.toHaveProperty("hostOwned");
+});
+
+it.each([
+  [undefined, "loading"],
+  ["starting", "loading"],
+  ["failed", "failed"],
+  ["active", "unavailable"],
+] as const)(
+  "reads a host-owned feature's region from its activation in any catalog state (%s)",
+  (status, reason) => {
+    const h = fixture(undefined, [emoji]);
+    h.roster([labeledChat(h.session.viewer, "feature", emojiLabel)]);
+    // The manager never activates a catalog entry under a host-owned id.
+    const namesake = (enabled: boolean): ConfigurationState => ({
+      status: "ready",
+      externalPluginsPaused: false,
+      catalog: {
+        profile: "fixture",
+        location: "Fixture",
+        plugins: [
+          {
+            manifest: { ...emoji, name: "Shadowed emoji" },
+            source: "bundled",
+            enabled,
+            revision: "bundled",
+            previous: null,
+            reloadable: false,
+            error: null,
+          },
+        ],
+      },
+    });
+    const catalogs: Record<string, ConfigurationState> = {
+      "no entry": pluginConfiguration(true),
+      loading: { status: "loading" },
+      recovery: { status: "recovery", reason: "Unavailable", canReset: false },
+      "enabled namesake": namesake(true),
+      "disabled namesake": namesake(false),
+    };
+    for (const [name, configuration] of Object.entries(catalogs)) {
+      h.plugins(
+        configuration,
+        status
+          ? { "buzz.emoji": { revision: "bundled", status, error: null } }
+          : {},
+      );
+      const snapshot = h.service.snapshot();
+      expect(snapshot.regions, name).toMatchObject([
+        { label: emojiLabel, reason, hostOwned: true },
+      ]);
+      expect([...snapshot.excluded], name).toEqual(["feature"]);
+    }
   },
 );
 

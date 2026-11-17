@@ -54,8 +54,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
-function fixture() {
-  const h = createSoloRegionFixture();
+function fixture(...args: Parameters<typeof createSoloRegionFixture>) {
+  const h = createSoloRegionFixture(...args);
   disposals.push(h.dispose);
   return h;
 }
@@ -1342,6 +1342,74 @@ it("keeps recovery chats reachable while distinguishing installed, unknown and n
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Owned" })).toBeInTheDocument();
   expect(screen.queryByText(/buzz\.region:/)).not.toBeInTheDocument();
+});
+
+it("offers no plugin settings for a host-owned feature's recovery region", async () => {
+  const h = fixture(undefined, [
+    { id: "buzz.emoji", name: "Emoji", apiVersion: 1 },
+  ]);
+  h.roster([
+    ...h.session.channels.list().channels,
+    {
+      id: "feature",
+      name: "Feature",
+      channelType: "solo",
+      creator: h.session.viewer,
+      labels: ["buzz.solo", "buzz.region:buzz.emoji:work"],
+    },
+  ]);
+  mount(h);
+  const region = (key: string) => {
+    const section = document.querySelector<HTMLElement>(
+      `[data-sidebar-section="solo-region:${key}"]`,
+    );
+    assert(section);
+    return within(section);
+  };
+  const notInstalled = "The plugin for these chats is not installed.";
+  const settings = { name: "Open plugin settings" };
+  // The catalog lists neither owner. Only the unknown one is "not installed".
+  const state = async (status: "starting" | "failed" | "active") => {
+    await act(() =>
+      h.plugins(
+        {
+          status: "ready",
+          externalPluginsPaused: false,
+          catalog: { profile: "fixture", location: "Fixture", plugins: [] },
+        },
+        { "buzz.emoji": { revision: "bundled", status, error: null } },
+      ),
+    );
+    expect(region("example/work").getByText(notInstalled)).toBeInTheDocument();
+    expect(screen.getAllByText(notInstalled)).toHaveLength(1);
+    expect(
+      region("example/work").getByRole("button", settings),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", settings)).toHaveLength(1);
+  };
+
+  await state("starting");
+  expect(region("buzz.emoji/work").getByRole("status")).toHaveTextContent(
+    "Loading Plugin chats…",
+  );
+
+  await state("failed");
+  expect(region("buzz.emoji/work").getByRole("alert")).toHaveTextContent(
+    "Plugin chats could not load",
+  );
+
+  await state("active");
+  expect(region("buzz.emoji/work").getByRole("status")).toHaveTextContent(
+    "Plugin chats could not load",
+  );
+
+  // No button stands in for the one that is gone, and the chat stays reachable.
+  expect(
+    region("buzz.emoji/work").queryByRole("button", { name: "Retry" }),
+  ).not.toBeInTheDocument();
+  expect(
+    region("buzz.emoji/work").getByRole("button", { name: "Feature" }),
+  ).toBeInTheDocument();
 });
 
 it.each([
