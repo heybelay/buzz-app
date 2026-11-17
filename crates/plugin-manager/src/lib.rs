@@ -1845,22 +1845,19 @@ mod tests {
         ]
         .map(|file| fs::read_to_string(format!("{root}/../app/{file}")).unwrap())
         .join("\n");
-        let manifests: BTreeMap<_, _> = features
+        // Each bundled manifest they import belongs to a host-owned feature. Read
+        // the imported path, not the entry that uses the manifest: an entry can
+        // be laid out in many ways, the path in one.
+        let mut host_ids: Vec<_> = features
             .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
             .filter_map(|line| {
-                let (name, path) = line
-                    .strip_prefix("import ")?
-                    .split_once(" from \"../bundled/")?;
-                let dir = path.strip_suffix("/manifest.json\";")?;
+                let path = line.split_once("\"../bundled/")?.1;
+                let dir = path.split('"').next()?.strip_suffix("/manifest.json")?;
                 let manifest = fs::read_to_string(format!("{root}/{dir}/manifest.json")).unwrap();
                 let manifest: Manifest = serde_json::from_str(&manifest).unwrap();
-                Some((name, manifest.id))
+                Some(manifest.id)
             })
-            .collect();
-        let mut host_ids: Vec<_> = features
-            .split(": { ...")
-            .skip(1)
-            .map(|entry| manifests[entry.split(',').next().unwrap()].to_string())
             .collect();
         // A feature whose manifest is written out names its id by a constant.
         let constants = fs::read_to_string(format!("{root}/../plugins/review-access.ts")).unwrap();
