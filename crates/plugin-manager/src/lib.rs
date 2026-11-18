@@ -580,27 +580,6 @@ fn enabled_by_default(id: &str) -> bool {
 const FORMERLY_INSTALLED: &[&str] = &["buzz.claude-code", "buzz.codex"];
 /// Host-owned features stay reserved even though they have no catalog entries.
 const BUILT_IN: &[&str] = &["buzz.emoji", "buzz.mentions", "buzz.plugin-requests"];
-/// The manifest files host-owned features ship. Plugin requests has none:
-/// `src/app/conversation-features.ts` writes its manifest out, with no host access.
-fn built_in_manifests() -> Vec<Manifest> {
-    vec![
-        serde_json::from_str(include_str!("../../../src/bundled/emoji/manifest.json"))
-            .expect("emoji manifest"),
-        serde_json::from_str(include_str!("../../../src/bundled/mentions/manifest.json"))
-            .expect("mentions manifest"),
-    ]
-}
-/// A host-owned feature's host access: what the manifest naming `id` declares,
-/// and none without one. `None` when `id` is not host-owned.
-fn built_in_grants(manifests: Vec<Manifest>, id: &str) -> Option<HostGrants> {
-    BUILT_IN.contains(&id).then(|| {
-        manifests
-            .into_iter()
-            .find(|manifest| manifest.id == id)
-            .and_then(|manifest| manifest.host)
-            .unwrap_or_default()
-    })
-}
 fn is_bundled(id: &str) -> bool {
     bundled_manifests().iter().any(|manifest| manifest.id == id)
 }
@@ -1444,11 +1423,6 @@ impl Manager {
     }
     pub fn host_grants(&self, id: &str, revision: &str) -> Result<HostGrants> {
         if revision == "bundled" {
-            // A host-owned feature is always on. No catalog entry enables it,
-            // so the registry is not read.
-            if let Some(grants) = built_in_grants(built_in_manifests(), id) {
-                return Ok(grants);
-            }
             let plugin = self
                 .catalog()?
                 .plugins
@@ -1874,13 +1848,13 @@ mod tests {
                 let dir = path.strip_suffix("/manifest.json\";")?;
                 let manifest = fs::read_to_string(format!("{root}/{dir}/manifest.json")).unwrap();
                 let manifest: Manifest = serde_json::from_str(&manifest).unwrap();
-                Some((name, manifest))
+                Some((name, manifest.id))
             })
             .collect();
         let mut host_ids: Vec<_> = features
             .split("manifest: { ...")
             .skip(1)
-            .map(|entry| manifests[entry.split(',').next().unwrap()].id.clone())
+            .map(|entry| manifests[entry.split(',').next().unwrap()].to_string())
             .collect();
         // A feature whose manifest is written out names its id by a constant.
         let constants = fs::read_to_string(format!("{root}/../plugins/review-access.ts")).unwrap();
@@ -1896,20 +1870,6 @@ mod tests {
         let mut reserved_ids: Vec<_> = super::BUILT_IN.iter().map(|id| id.to_string()).collect();
         reserved_ids.sort_unstable();
         assert_eq!(reserved_ids, host_ids);
-
-        // Native reads a host-owned feature's host access from the manifest
-        // file the desktop imports, so none may be declared in TypeScript.
-        let mut imported: Vec<_> = manifests.into_values().collect();
-        imported.sort_by(|a, b| a.id.cmp(&b.id));
-        let mut native = super::built_in_manifests();
-        native.sort_by(|a, b| a.id.cmp(&b.id));
-        assert_eq!(native, imported);
-        assert!(
-            !features
-                .lines()
-                .any(|line| line.split("//").next().unwrap().contains("host:")),
-            "conversation-features.ts declares host access, which native cannot read"
-        );
     }
 
     #[test]
@@ -2865,94 +2825,6 @@ mod tests {
             paused.host_grants("block.builderlab", "bundled").unwrap(),
             grants
         );
-    }
-
-    #[test]
-    fn host_grants_treat_host_owned_features_as_always_on() {
-        let temp = tempfile::tempdir().unwrap();
-        let registry = temp.path().join("profiles/test/registry.json");
-        fs::create_dir_all(registry.parent().unwrap()).unwrap();
-        // An older profile may hold a disabled flag for one; it is ignored.
-        fs::write(
-            &registry,
-            r#"{"version":2,"bundledEnabled":true,"bundledOverrides":{"buzz.emoji":false,"buzz.mentions":false,"buzz.plugin-requests":false},"installed":{}}"#,
-        )
-        .unwrap();
-        let manager = Manager::open(Some(temp.path().into()), "test", false).unwrap();
-        // Safe mode pauses external plugins only.
-        let paused = Manager::open(Some(temp.path().into()), "test", true).unwrap();
-        let catalog = manager.catalog().unwrap();
-        for id in ["buzz.emoji", "buzz.mentions", "buzz.plugin-requests"] {
-            assert!(!catalog
-                .plugins
-                .iter()
-                .any(|plugin| plugin.manifest.id == id));
-            // No host-owned manifest declares host access today, so each
-            // capability is refused as not declared.
-            for opened in [&manager, &paused] {
-                assert_eq!(
-                    opened.host_grants(id, "bundled"),
-                    Ok(super::HostGrants::default())
-                );
-            }
-            // An installed plugin's revision does not reach it.
-            assert_eq!(
-                manager.host_grants(id, &"0".repeat(64)),
-                Err("Plugin is not installed".into())
-            );
-        }
-
-        // Catalog plugins still need an enabled catalog entry.
-        assert_eq!(
-            manager.host_grants("buzz.channels", "bundled"),
-            Ok(super::HostGrants::default())
-        );
-        manager.change("disable", "buzz.terminal").unwrap();
-        for id in ["buzz.terminal", "unknown.plugin"] {
-            assert_eq!(
-                manager.host_grants(id, "bundled"),
-                Err("Bundled plugin is disabled or unavailable".into())
-            );
-        }
-
-        // A registry that cannot be read stops catalog plugins alone.
-        fs::write(&registry, "not a registry").unwrap();
-        assert!(manager.host_grants("buzz.channels", "bundled").is_err());
-        assert_eq!(
-            manager.host_grants("buzz.emoji", "bundled"),
-            Ok(super::HostGrants::default())
-        );
-    }
-
-    #[test]
-    fn host_owned_features_get_only_their_own_declared_host_access() {
-        let manifests = || -> Vec<Manifest> {
-            serde_json::from_value(serde_json::json!([
-                { "id": "buzz.emoji", "name": "Emoji", "apiVersion": 1, "host": { "files": true } },
-                { "id": "buzz.mentions", "name": "Mentions", "apiVersion": 1 },
-                // Neither is host-owned: a catalog plugin and an installed one.
-                { "id": "buzz.channels", "name": "Channels", "apiVersion": 1, "host": { "mcp": true } },
-                { "id": "example.page", "name": "Example", "apiVersion": 1, "host": { "mcp": true } }
-            ]))
-            .unwrap()
-        };
-        assert_eq!(
-            super::built_in_grants(manifests(), "buzz.emoji"),
-            Some(super::HostGrants {
-                files: true,
-                ..Default::default()
-            })
-        );
-        // Without a manifest, or with one that declares nothing: no access.
-        for id in ["buzz.mentions", "buzz.plugin-requests"] {
-            assert_eq!(
-                super::built_in_grants(manifests(), id),
-                Some(super::HostGrants::default())
-            );
-        }
-        for id in ["buzz.channels", "example.page"] {
-            assert_eq!(super::built_in_grants(manifests(), id), None);
-        }
     }
 
     #[test]
