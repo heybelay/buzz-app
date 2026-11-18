@@ -27,8 +27,6 @@ export type SoloRegion = Readonly<{
   live: ReadonlySet<string>;
   /** A ready source keeps it out of the sidebar; its chats stay excluded. */
   hidden?: true;
-  /** No source, and a host-owned owner: plugin settings cannot manage it. */
-  hostOwned?: true;
 }>;
 export type SoloPlacement = Readonly<{
   regions: readonly SoloRegion[];

@@ -1,7 +1,6 @@
 import { createNavigationController } from "../navigation/controller";
 import { createMemoryHistory } from "../navigation/history";
 import type { OpenTarget } from "../navigation/targets";
-import type { PluginManifest } from "../../plugins/api";
 import type { ConfigurationState } from "../../plugins/types";
 import type { PluginStates } from "../../plugins/runtime";
 import { Context } from "@deepseek-ai/cordis";
@@ -18,10 +17,7 @@ import type {
 import { SoloNavigationService } from "./solo-navigation";
 
 const label = "buzz.region:example:work";
-export function createSoloRegionFixture(
-  viewer = "a".repeat(64),
-  hostOwned: readonly PluginManifest[] = [],
-) {
+export function createSoloRegionFixture(viewer = "a".repeat(64)) {
   const root = new Context();
   const navigation = createNavigationController(createMemoryHistory());
   root.provide("navigation", navigation.navigation);
@@ -49,7 +45,7 @@ export function createSoloRegionFixture(
   const plugins = {
     snapshot: () => ({
       configuration,
-      hostOwned,
+      hostOwned: [],
       activation,
       busy: false,
       error: null,

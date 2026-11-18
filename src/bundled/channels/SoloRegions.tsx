@@ -386,7 +386,7 @@ function RegionFrame({
         >
           Retry
         </Button>
-      ) : region.hostOwned ? null : (
+      ) : (
         <Button
           size="sm"
           onClick={() =>

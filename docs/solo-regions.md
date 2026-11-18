@@ -17,15 +17,6 @@ imply Solo. Existing personal workspace assignments remain stored while those
 assignments are dormant. Label edits preserve region labels. There is no public
 remove operation.
 
-A [built-in conversation
-feature](plugin-architecture.md#emoji-and-reusable-conversation-ui) has no
-catalog entry and is always on, so the catalog never decides its region. Without
-a source, the region follows the feature's activation: loading until it settles,
-failed if it failed, and unavailable once it is active. It is never
-not-installed, off, or disabled: its chats stay in the recovery placement, and
-the recovery region offers neither the Retry nor the Open plugin settings
-button. With a source, it behaves like any other region.
-
 Each bind has a fresh incarnation. Reconnect and Retry abort the previous bind;
 old handles, menus, state writes, and reveal subscribers cannot act in the new
 incarnation. A source must return increasing revisions with the current binding.

@@ -10,7 +10,6 @@ import type { RelayData, RelaySnapshot } from "../relay/service";
 import type { RelaySession } from "../relay/session";
 import { parseOpenTarget, type JsonValue } from "../navigation/targets";
 import type { PluginManager } from "../../plugins/manager";
-import { resolveOwner } from "../../plugins/owner";
 import { relayPartition } from "../relay/partition";
 import { ownSolo, soloLabels } from "../solo/labels";
 import {
@@ -396,16 +395,8 @@ export class SoloNavigationService extends Service implements SoloNavigation {
         }
         const plugins = this.plugins?.snapshot();
         const configuration = plugins?.configuration;
-        // A host-owned feature always runs and has no catalog entry. Neither
-        // id in `buzz.region:<owner>:<source>` holds a colon.
-        const featureForRegionLabel = (label: string) => {
-          const id = label.slice(REGION_PREFIX.length, label.lastIndexOf(":"));
-          return plugins && resolveOwner(plugins, id)?.hostOwned
-            ? { status: plugins.activation[id]?.status }
-            : undefined;
-        };
         const pluginForRegionLabel = (label: string) =>
-          configuration?.status === "ready" && !featureForRegionLabel(label)
+          configuration?.status === "ready"
             ? configuration.catalog.plugins.find((plugin) =>
                 label.startsWith(`${REGION_PREFIX}${plugin.manifest.id}:`),
               )
@@ -435,18 +426,6 @@ export class SoloNavigationService extends Service implements SoloNavigation {
           ...placement,
           regions: placement.regions.map((region) => {
             if (region.reason !== "off") return region;
-            const feature = featureForRegionLabel(region.label);
-            if (feature) {
-              // Running without this source, it cannot be "off": the region
-              // is unavailable. Not started yet, it is about to start.
-              const reason =
-                feature.status === "failed"
-                  ? "failed"
-                  : feature.status === "active"
-                    ? "unavailable"
-                    : "loading";
-              return { ...region, hostOwned: true as const, reason };
-            }
             if (configuration?.status === "loading")
               return { ...region, reason: "loading" as const };
             if (configuration?.status !== "ready") return region;
